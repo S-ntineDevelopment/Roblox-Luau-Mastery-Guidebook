@@ -1,102 +1,128 @@
 # Stage 18: Release Engineering, Versioning, and LiveOps
 
-Mastery includes shipping safely. Systems must evolve while players, data, protocols, and servers are live.
+Release engineering manages change while servers, players, saved data, and external systems may still reflect older versions. The amount of process should be proportional to the blast radius.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> Every platform needs versioning, rollout, rollback, observability, migration, and removal plans.
+## What can coexist
 
-## Computer Science Fundamentals
+Account for the versions that can actually overlap:
 
-- Semantic versioning: communicate compatibility expectations.
-- Backward compatibility: old clients/data can still operate during migration windows.
-- Feature flags: runtime behavior switches with ownership and cleanup.
-- Canary releases: expose risky changes to a small population first.
-- Rollback engineering: return to a known-safe state quickly.
-- Incident response: identify, mitigate, repair, and learn.
-- Change management: every risky change has scope, owner, and verification.
+- old live servers after a new publish;
+- players teleporting between server/place versions;
+- saved records from older schemas;
+- MemoryStore/MessagingService work created by older code;
+- separately released packages/tools;
+- external Open Cloud workers.
 
-## Roblox API Grounding
+Do not build a general protocol migration framework for clients that cannot coexist in the same server unless another real compatibility path requires it.
 
-- DataStoreService supports persistent state and exposes request budgets; writes can fail and must be handled with `pcall`.
-- DataStore `UpdateAsync` callbacks must not yield, so transaction design must prepare data before callback execution.
-- MemoryStoreService is ephemeral, high-throughput, and TTL-based; use it for cross-server queues/caches, not durable truth.
-- Remote protocol versioning matters because live servers/clients may not transition simultaneously.
-- Creator Hub Data Stores Manager and observability tools should be part of release/debug workflow where available.
+## Place versions and rollback
 
-## Performance Impact
+Roblox place Version History provides published checkpoints and restoration tools. Restoring code/place content does not automatically roll back:
 
-- Feature flags add branches; resolve them outside hot loops where possible.
-- Protocol compatibility can increase handler complexity; remove old versions after the compatibility window.
-- Migrations can be expensive; dry-run, batch, budget, and observe them.
-- Rollout telemetry must be lightweight and sampled where high-frequency systems are involved.
-- Rollback switches must avoid expensive cleanup work in critical paths.
+- DataStore migrations;
+- purchases or economy mutations;
+- MemoryStore messages;
+- analytics/external side effects;
+- incompatible content already created.
 
-## Mastery Topics
+Every high-risk release needs a data-aware rollback/forward-fix decision, not only a previous place version.
 
-1. Semantic versioning for engine packages.
-2. Protocol versioning.
-3. Data migration rollout.
-4. Feature flags and kill switches.
-5. Canary releases.
-6. Compatibility windows.
-7. Rollback plans.
-8. Deprecation policy.
-9. Live incident playbooks.
-10. Post-release audits.
-11. DataStore budget-aware migration.
-12. MemoryStore-backed rollout coordination.
-13. Protocol dual-read/dual-write phases.
-14. Automated health gates.
-15. Removal audits for stale flags and adapters.
+## Feature flags and live configuration
 
-## Extreme Usage Cases
+Use flags/config for staged rollout, emergency disablement, or controlled experiments. Define owner, default, scope, fallback, observation, and removal date.
 
-- Roll out a new gunkit hit validator to 5% of servers.
-- Support old and new network schema versions during migration.
-- Disable a broken vehicle system without taking down the whole game.
-- Run a dry-run profile migration before enabling writes.
-- Keep old weapon configs readable while new configs write to a ledger-backed model.
-- Canary an anti-cheat strictness increase and compare rejection/false-positive metrics.
+Roblox Configs can provide read-only live values with their documented rollout behavior. Local modules, DataStores, MemoryStores, or third-party systems have different consistency and availability. Choose based on actual requirements.
 
-## Best Case Scenario
+Do not leave permanent dead flags or test all possible flag combinations by assumption; combinations are product states that need coverage.
 
-Every serious platform has:
+## Schema migration
 
-```text
-version
-feature flag
-migration path
-health metrics
-rollback switch
-compatibility policy
-deprecation date
-```
+Prefer migrations that are:
 
-## Practice Project
+- versioned and idempotent;
+- tested from every supported version;
+- safe to retry;
+- observable and bounded;
+- compatible with old servers when overlap is possible;
+- reversible only when data semantics truly permit it.
 
-Design a release plan for `ServerAuthoritativeHitscanV2`:
+Sometimes a forward-fix migration is safer than down-migration. Preserve backups/evidence and avoid destructive cleanup until the rollout is proven.
 
-- feature flag
-- protocol version
-- old/new validator adapter
-- canary rollout
-- metrics
-- rejection reason comparison
-- rollback switch
-- deprecation date for v1
+## Protocol evolution
 
-Acceptance standard:
+Use the smallest compatibility technique that fits:
 
-The feature can be enabled, observed, compared, rolled back, and later cleaned up.
+- optional fields with safe defaults;
+- versioned message variants;
+- dual read/write during a bounded transition;
+- reject-and-refresh for incompatible sessions;
+- server/place routing that prevents incompatible peers.
 
-## Permanent Rule
+Remove compatibility code after the coexistence window closes.
 
-If a system cannot be rolled out, observed, and rolled back, it is not production-ready.
+## Release gates
 
-## References
+Choose checks according to risk:
 
-- Roblox Creator Hub: Data stores and DataStoreService.
-- Roblox Creator Hub: Memory stores.
-- Roblox Creator Hub: Remote events and callbacks.
-- Roblox Creator Hub: Services.
+- format/lint/type/build;
+- deterministic fixtures and unit tests;
+- Studio server/client smoke;
+- migration dry run on representative copies;
+- hostile-input and lifecycle repetition;
+- target-device/scale profiling;
+- canary percentage or private test universe;
+- live dashboards and stop criteria.
+
+A green static build cannot prove live DataStore, physics, networking, streaming, or visual behavior.
+
+## Kill switches and degraded modes
+
+A kill switch should prevent new risky work and define what happens to in-flight sessions. Turning a feature off may require cancelling jobs, preserving pending transactions, removing UI entry points, or leaving existing matches to finish.
+
+Test the switch under load and dependency failure. An untested emergency path is not a reliable rollback.
+
+## Observability and decision rules
+
+Before release, specify:
+
+- success and guardrail metrics;
+- comparison baseline;
+- sample/segment;
+- alert/rollback thresholds;
+- observation duration;
+- person/system authorized to stop rollout.
+
+Avoid high-cardinality or private payload logging. Monitor correctness as well as performance/business metrics.
+
+## Practice project
+
+Release a fake schema/protocol change through:
+
+1. old-reader/new-writer compatibility fixture;
+2. migration dry run;
+3. canary flag;
+4. simulated old server and teleport payload;
+5. kill switch while operations are in flight;
+6. place rollback showing why data still needs a forward/recovery plan;
+7. removal of the temporary compatibility and flag code.
+
+## Completion evidence
+
+You understand this stage when you can:
+
+- enumerate versions/data that can coexist;
+- distinguish place rollback from data/effect rollback;
+- migrate idempotently under old-server overlap;
+- define and test in-flight kill-switch behavior;
+- separate static gates from Studio/live proof;
+- remove temporary rollout machinery.
+
+## Primary references
+
+- [Roblox Version History](https://create.roblox.com/docs/projects/version-history)
+- [Roblox data stores](https://create.roblox.com/docs/cloud-services/data-stores)
+- [DataStore errors and limits](https://create.roblox.com/docs/cloud-services/data-stores/error-codes-and-limits)
+- [Choosing Roblox cloud services and Configs](https://create.roblox.com/docs/cloud-services/data-stores-vs-memory-stores)
+- [Roblox memory stores](https://create.roblox.com/docs/cloud-services/memory-stores)

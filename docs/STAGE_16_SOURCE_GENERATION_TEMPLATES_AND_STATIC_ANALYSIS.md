@@ -1,101 +1,82 @@
-# Stage 16: Source Generation, Templates, and Static Analysis
+# Stage 16: Templates, Code Generation, and Static Analysis
 
-Mastery means the engine can generate correct structure and reject bad structure before runtime. If a policy is important, the project should eventually have a template, generator, static check, audit, or CI gate for it.
+Tooling can automate repeatable syntax and detectable repository policy. It cannot generally prove runtime authority, lifecycle correctness, network security, visual quality, or live-provider behavior.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> If humans repeat a framework pattern manually, turn it into a template, generator, validator, or static audit.
+## Choose the tool for the claim
 
-## Computer Science Fundamentals
+- **Template**: copy a reviewed starting structure that developers then own.
+- **Generator**: produce files/data from an authoritative input.
+- **Formatter**: normalize syntax/layout.
+- **Linter/static checker**: detect patterns or type errors without executing gameplay.
+- **Build step**: transform or validate a source tree.
+- **Runtime test**: execute behavior in a controlled environment.
 
-- Metaprogramming: code writes consistent code or config.
-- Static analysis: inspect source without running it.
-- Linting: enforce style and policy automatically.
-- Abstract syntax thinking: find imports, calls, globals, and dependency direction.
-- Code generation: produce boilerplate from a higher-level schema.
-- Build pipelines: make validation part of project workflow.
-- Regression prevention: once a bug becomes a rule, automate the rule.
+“If a policy matters, automate it” is aspirational, not always cost-effective. Automate rules that are stable, machine-detectable, and frequent enough to justify maintenance.
 
-## Roblox API Grounding
+## Static-analysis limits
 
-- ModuleScripts make feature packages generator-friendly because they return typed tables/contracts.
-- Luau type checking supports generated type surfaces and contract stubs.
-- Rojo project maps make source trees auditable outside Studio.
-- Creator Hub service boundaries guide audits: raw RemoteEvents, DataStoreService, RunService, CollectionService, and Attributes should appear only in allowed adapter layers.
-- ProceduralModel generator modules show Roblox's own pattern for parameter-driven generation; generation code should write into its target container rather than mutate arbitrary hierarchy.
+A checker can reliably find an AST pattern such as a raw `RemoteEvent.OnServerEvent` outside an allowed directory. It usually cannot prove that every semantic input is validated, the server owns the outcome, or cleanup occurs on every runtime path without deeper whole-program analysis.
 
-## Performance Impact
+Report what the rule detects, likely false positives/negatives, and suppression policy. Do not label architectural heuristics as compiler proof.
 
-- Generated feature skeletons reduce manual mistakes but should not generate bloated runtime layers.
-- Static audits are build-time cost, not gameplay cost.
-- Precomputed registries can reduce runtime discovery overhead.
-- Generated validators must avoid excessive allocation in hot paths.
-- Dependency checks prevent performance regressions caused by hidden service imports and cross-layer coupling.
+## Generated code
 
-## Mastery Topics
+Define:
 
-1. Feature package generators.
-2. Config schema generators.
-3. Network schema generators.
-4. Contract test generators.
-5. Registry audit tools.
-6. Dependency-direction static checks.
-7. Feature-name conditional detection.
-8. Attribute misuse detection.
-9. Raw RemoteEvent access detection.
-10. CI/preflight architecture gates.
-11. DataStore access boundary audits.
-12. RunService/Heartbeat ownership audits.
-13. Generated rejection reason enums.
-14. Generated docs from schemas.
-15. Architecture score reports.
+- source of truth;
+- deterministic output;
+- generator/tool version;
+- whether output is checked in;
+- how manual edits are prevented or reconciled;
+- stale-output detection;
+- formatting/type-checking of output;
+- upgrade/rollback path.
 
-## Extreme Usage Cases
+Generated code can be bloated or slower than hand-written code. Measure hot generated paths and keep diagnostics mapped back to source inputs.
 
-- Generate a new weapon package with config, fire mode stub, tests, and network schema.
-- Audit the repo for shared code branching on feature names.
-- Reject modules that import Roblox services from core utility layers.
-- Detect direct durable-state mutation outside transaction services.
-- Detect raw `RemoteEvent:FireServer` usage outside network adapters.
-- Detect Attributes used as authoritative ammo/health/currency state.
+## Templates
 
-## Best Case Scenario
+A template should contain the minimum proven structure. Optional subsystems should remain optional; generating lifecycle, networking, persistence, registry, and diagnostics layers for every tiny feature teaches ceremony rather than architecture.
 
-The engine ships with tooling:
+Include ownership and deletion instructions for placeholder files so unused scaffolding does not survive indefinitely.
 
-```text
-create-feature weapon Rifle
-audit-contracts
-audit-dependencies
-audit-network
-audit-persistence
-audit-attributes
-audit-runservice
-```
+## Roblox/Rojo checks
 
-Bad architecture fails before it reaches Studio.
+Static checks may validate source paths, project files, require conventions, forbidden client/server placements, or known service boundaries. Those are repository policies, not Roblox platform requirements.
 
-## Practice Project
+Rojo sourcemaps and build checks can prove mapping/structure, not that the place behaves correctly in Studio. Keep build, type, unit, Studio runtime, live-provider, and visual proof separate.
 
-Build an architecture audit tool that scans source for:
+## Source transformations and migrations
 
-- raw RemoteEvent calls outside network adapters
-- `game:GetService("DataStoreService")` outside persistence adapters
-- `RunService.Heartbeat` outside scheduler/adapters
-- feature-name conditionals inside shared services
-- Attribute writes to banned authoritative keys
+Prefer AST-aware edits for code. Regex is acceptable for narrowly specified text with fixtures, but can corrupt comments, strings, types, or formatting when treated as a parser.
 
-Acceptance standard:
+Make generators/migrations fail safely and provide dry-run/diff output before large rewrites.
 
-The tool reports file path, line, rule id, severity, and suggested boundary.
+## Practice project
 
-## Permanent Rule
+Build one feature template and one static check:
 
-A policy that cannot be checked will eventually be violated.
+- template produces only config, public API, server entry, client entry, and test placeholder when requested;
+- checker detects raw client-to-server handlers outside an approved network boundary;
+- fixtures include true positives, allowed cases, comments/strings, and false-positive cases;
+- CI distinguishes checker success from runtime security proof.
 
-## References
+## Completion evidence
 
-- Roblox Creator Hub: Luau and type checking.
-- Roblox Creator Hub: ModuleScript.
-- Roblox Creator Hub: Remote events and callbacks.
-- Roblox Creator Hub: Procedural models.
+You understand this stage when you can:
+
+- name the exact property a tool proves;
+- avoid claiming semantic correctness from text matching;
+- regenerate deterministically and detect drift;
+- keep templates minimal and optional;
+- distinguish source/build proof from Studio/runtime/live proof;
+- maintain fixtures and suppressions as the project evolves.
+
+## Primary references
+
+- [Luau type system](https://luau.org/types/)
+- [Luau linting](https://luau.org/lint/)
+- [Luau syntax](https://luau.org/syntax/)
+- [Roblox client-server runtime](https://create.roblox.com/docs/projects/client-server)

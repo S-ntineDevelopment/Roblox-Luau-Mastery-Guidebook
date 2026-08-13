@@ -1,171 +1,116 @@
-# Stage 14: Contract-First Feature Architecture
+# Stage 14: Contract-First Feature Design
 
-Contract-first architecture means the shared system defines the rules before features exist. Features plug in by satisfying typed contracts.
+A contract describes what callers and implementations may rely on. Designing that boundary early is useful when multiple owners, implementations, or trust domains must coordinate. It is not a reason to create an interface and registry for every feature.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> Shared systems own the protocol, lifecycle, validation, networking, persistence, and observability. Features supply identity, config, and domain behavior.
+## Start from use cases
 
-Foundational catalog policy:
+Before defining a contract, identify:
 
-> Managers stay agnostic. Catalogs define dynamic behavior. Features register contracts. Shared systems execute the rules.
+- concrete callers and operations;
+- authoritative state and validation;
+- expected failures;
+- ownership/lifecycle;
+- which variation is known now;
+- which compatibility promises are real.
 
-A reusable manager must not know concrete feature names unless it is that feature package or a clearly bounded domain platform. Dynamic behavior belongs in typed catalogs and registries: strategies, rules, schemas, effects, handlers, adapters, permissions, and policies are admitted once, inspected through tooling, and executed through shared services.
+A speculative “generic” interface often encodes the wrong variation and pushes special cases into configuration.
 
-Official Roblox grounding:
+## Closed and open sets
 
-- ModuleScripts are the correct Roblox mechanism for shared reusable code because they return one value from `require()` and are cached per Luau environment.
-- Luau `--!strict`, exported types, and gradual typing make feature contracts visible before runtime.
-- RemoteEvents, UnreliableRemoteEvents, and RemoteFunctions are transport tools; contract-first architecture wraps them in typed protocol APIs.
-- Actors and Parallel Luau matter later for scale, but contract boundaries must exist before parallel work is safe.
+For a small closed set of variants, a tagged union and direct conditional can provide:
 
-Computer science grounding:
+- visible exhaustive handling;
+- easy navigation;
+- no registration-order failures;
+- simple refactoring.
 
-- Interface segregation: callers receive only the methods/capabilities they need.
-- Dependency inversion: feature code depends on contracts, not concrete platform internals.
-- Open/closed principle: new features extend registries instead of modifying shared services.
-- Command pattern: client/user/NPC intent becomes typed commands admitted by shared systems.
-- Strategy pattern: fire modes, hit resolvers, prompt actions, AI actions, and vehicle policies are replaceable behavior contracts.
-- State machines: lifecycle and session modes are explicit instead of implicit booleans.
-- Data abstraction: feature config and runtime state are hidden behind typed APIs.
-- Information hiding: Roblox Instances, remotes, persistence providers, and caches stay behind compatibility layers.
+For an open set owned by separate packages or content, a registry/strategy contract can provide:
 
-Performance grounding:
+- ID-based lookup;
+- independent extension;
+- admission validation;
+- tooling/discovery.
 
-- Contract-first design reduces duplicated logic and branch-heavy shared services.
-- Registries are usually O(1) lookup by id; validation cost moves to admission time instead of every hot-path branch.
-- Typed configs and prevalidated registrations allow runtime paths to use smaller, predictable checks.
-- Stable contracts make it easier to cache resolved behavior safely.
-- Too many dynamic contract layers in hot loops can add overhead; validate at boundaries, then run direct resolved functions in performance-critical paths.
-- ModuleScript caching is helpful, but do not assume it crosses Actor VM boundaries in Parallel Luau.
+The earlier rule “if adding a feature edits shared code, the contract is incomplete” was false. Editing a clear closed dispatcher can be the safest design.
 
-## Mastery Topics
+## Contract forms
 
-1. Public service contracts before implementation.
-2. Feature config schemas before feature behavior.
-3. Extension registries instead of feature-name branches.
-4. Capability-limited context objects.
-5. Domain result/rejection types.
-6. Versioned contracts for long-lived systems.
-7. Contract tests for every extension point.
-8. Runtime admission for registered behavior.
-9. Compatibility adapters for old feature packages.
-10. Tooling that proves a feature satisfies the platform contract.
-11. Contract admission phases: load, validate, register, freeze, run.
-12. Dependency-direction checks: features depend inward on contracts; shared systems do not import feature internals.
-13. Hot-path contract resolution: resolve behavior once, then call the resolved strategy directly.
-14. Failure contracts: every rejection has a typed reason and debug surface.
-15. Contract evolution: old packages remain compatible through adapters or versioned schemas.
-16. Dynamic behavior catalogs: feature behavior is registered, validated, inspected, versioned, and executed without feature-name branches.
+A contract may be:
 
-## Extreme Usage Cases
+- a plain function signature;
+- a ModuleScript return type;
+- a table/method shape;
+- a tagged command/result union;
+- a runtime schema;
+- a lifecycle protocol;
+- a documented sequence of operations.
 
-- A weapon platform where adding a new gun never edits the fire service.
-- A prompt platform where doors, shops, NPC dialogue, and vehicles are all registered actions.
-- A vehicle platform where cars differ by config and strategy modules, not copied controllers.
-- A mission platform where jobs, crimes, and objectives share session contracts.
-- An NPC platform where behavior trees, utility scorers, and weapon actions satisfy the same action contracts as player systems.
-- A persistence platform where shops, prompts, rewards, and gunkit unlocks submit typed transactions instead of mutating player data directly.
-- A networking platform where feature packages register message schemas but never touch raw RemoteEvents.
-- A UI/platform service where panels, routes, notification types, and debug inspectors register presentation adapters instead of editing one central UI router by feature name.
+Prefer the smallest form that captures the real guarantee.
 
-## Best Case Scenario
+## Registration
 
-The engine exposes a small number of stable contracts. Features become lightweight packages:
+When a registry is justified, define:
 
-```text
-Feature/
-  Config.luau
-  ServerBehavior.luau
-  ClientPresenter.luau
-  Tests.luau
-```
+- ID namespace and duplicate behavior;
+- registration/bootstrap order;
+- static type and runtime admission;
+- lookup failure;
+- replacement/removal/version policy;
+- iteration order if observable;
+- debug listing and ownership.
 
-The platform validates the feature, registers it, runs it, observes it, and rejects it if it violates the contract.
+Dictionary lookup is commonly efficient but not a strict timing guarantee. Registration validation cannot replace runtime permission/state/security checks.
 
-Best-case runtime flow:
+## Capability and dependency boundaries
 
-```text
-Feature package loaded
-  -> Config schema validated
-  -> Behavior contracts checked
-  -> Dependencies injected through limited context
-  -> Feature registered by identity
-  -> Hot-path handlers resolved
-  -> Runtime execution uses shared validation/lifecycle/network/persistence/diagnostics
-```
+Give extension code the operations it needs when that reduces coupling or privilege. A capability-shaped table is an architecture technique, not necessarily a security boundary in unrestricted same-environment code.
 
-Best-case performance flow:
+Dependency injection can be simple explicit parameters. A direct import is acceptable for stable dependencies. Avoid a service locator/container that makes dependencies less visible.
 
-```text
-Slow path:
-  load config -> validate schema -> resolve contracts -> cache runtime handles
+## Roblox placement
 
-Hot path:
-  command admitted -> resolved handler called -> typed result emitted
-```
+ReplicatedStorage contents are available to clients and replicated ModuleScript source should be assumed inspectable. Keep server secrets and authority-only implementations in server containers. Shared schemas/types may live in replicated code, but do not mistake hiding implementation for server validation.
 
-This prevents repeated string branching and repeated config validation during gameplay.
+Raw RemoteEvents are valid Roblox primitives. A protocol adapter is useful when it centralizes schemas, validation, rates, diagnostics, or versioning; wrapping every remote with no additional policy is optional indirection.
 
-## Roblox API Usage
+## Performance
 
-Use ModuleScripts for contracts, registries, config, service APIs, and feature packages.
+Contract-first design is not automatically faster. Indirection, allocation, generic validators, registry lookup, and callback dispatch all have costs. The performance benefit comes only if the design removes repeated work, admits config once, improves batching, or enables a measured optimization.
 
-Use ReplicatedStorage only for shared code and schemas that both client and server may safely know. Keep server authority implementations in ServerScriptService or server-only containers.
+Keep hostile-input validation on every request even when static config was validated at registration.
 
-Use RemoteEvents for one-way gameplay messages and wrap them behind typed network channels. Use RemoteFunctions sparingly because they yield for a response and are a poor fit for high-frequency gameplay.
+## Practice project
 
-Use UnreliableRemoteEvents only for non-critical, continuously changing data where dropped/out-of-order updates are acceptable.
+Implement five fixed prompt actions first with a tagged union and exhaustive dispatcher. Then build a registry version that supports third-party feature modules.
 
-Use Actors and Parallel Luau later for isolated compute work, but do not design contracts that rely on shared mutable ModuleScript state across Actor VMs.
+Compare:
 
-## Common Failure Modes
+- adding/removing an action;
+- invalid/missing registration;
+- discoverability and stack traces;
+- static checking;
+- runtime overhead;
+- compatibility burden.
 
-- Shared service imports feature packages by name.
-- Feature configs are validated only after gameplay starts.
-- Raw RemoteEvents are fired directly from feature code.
-- A base class grows dozens of optional methods and flags.
-- Package identity is copied into several sibling config files.
-- Hot paths repeatedly validate config that should have been admitted once.
-- Compatibility layers hide bad dependencies instead of reducing them.
-- Feature code receives full service/world access when it only needs a narrow capability.
+Choose based on the actual extension model, not “open/closed” slogans.
 
-## Practice Project
+## Completion evidence
 
-Build a contract-first weapon feature platform.
+You understand this stage when you can:
 
-Required contracts:
+- derive a boundary from callers and failures;
+- choose a conditional for a closed set without treating it as a defect;
+- justify a registry for an open set;
+- separate admission validation from per-request validation;
+- state what a capability/API does and does not secure;
+- delete speculative extension points.
 
-- `WeaponConfig`
-- `FireMode`
-- `HitResolver`
-- `ReloadPolicy`
-- `RecoilModel`
-- `DamageEffect`
-- `FireCommand`
-- `FireResult`
+## Primary references
 
-Required platform services:
-
-- `WeaponRegistry`
-- `WeaponConfigValidator`
-- `WeaponRuntimeFactory`
-- `CombatValidationService`
-- `NetworkSchemaRegistry`
-- `DiagnosticsService`
-
-Acceptance standard:
-
-You can add `Pistol`, `Shotgun`, and `BurstRifle` without editing shared fire service code by feature name.
-
-## Permanent Rule
-
-If adding a feature requires editing shared code by name, the shared contract is incomplete.
-
-## References
-
-- Roblox Creator Hub: ModuleScript.
-- Roblox Creator Hub: Reuse code with ModuleScripts.
-- Roblox Creator Hub: Luau and type checking.
-- Roblox Creator Hub: Remote events and callbacks.
-- Roblox Creator Hub: Actor and Parallel Luau.
+- [Luau structural types](https://luau.org/types/)
+- [Luau union and intersection types](https://luau.org/types/unions-and-intersections/)
+- [Roblox ModuleScripts](https://create.roblox.com/docs/scripting/module)
+- [Roblox security tactics](https://create.roblox.com/docs/scripting/security/security-tactics)
+- [Roblox remote events and callbacks](https://create.roblox.com/docs/scripting/events/remote)

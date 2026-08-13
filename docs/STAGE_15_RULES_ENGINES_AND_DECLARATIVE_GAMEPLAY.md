@@ -1,106 +1,94 @@
 # Stage 15: Rules Engines and Declarative Gameplay
 
-Rules engines let gameplay be assembled from validated conditions, costs, effects, cooldowns, targeting, permissions, rewards, and rejection reasons. This is the natural next step after contract-first design: once contracts exist, features should declare what they want to do while the shared rules engine owns the order, validation, transactions, networking, and diagnostics.
+A rules engine interprets data or composable rule objects to decide gameplay outcomes. It is useful when many features share stable evaluation semantics. It can also turn simple code into a difficult custom language.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> Feature packages declare rules. Shared engines validate, order, execute, audit, and replicate them.
+## When it helps
 
-## Computer Science Fundamentals
+Consider a rules engine when:
 
-- Interpreter pattern: the rules engine interprets declarative rule records.
-- Command pattern: a requested action becomes a command admitted into the rule pipeline.
-- Strategy pattern: conditions, effects, target selectors, and cost handlers are replaceable strategies.
-- Chain of responsibility: validation flows through ordered checks with typed rejection reasons.
-- Algebraic data modeling: effects and conditions become discriminated unions.
-- Transaction processing: rule execution commits or rejects as a unit.
-- Referential transparency where possible: pure condition/effect calculations are easier to test and cache.
+- designers author many data-driven variants;
+- validation/effect ordering must be consistent;
+- the same conditions/costs/effects combine repeatedly;
+- preview/explanation tooling needs a common representation;
+- rule definitions need versioning or audit.
 
-## Roblox API Grounding
+Use direct domain code when behavior is unique, highly procedural, timing-sensitive, or easier to understand in ordinary Luau.
 
-- Use ModuleScripts for rule definitions, registries, validators, and feature configs.
-- Use RemoteEvents only as transport for typed commands; the rules engine admits and executes them server-side.
-- Use DataStoreService only through transaction/persistence services when rules affect durable state.
-- Use MemoryStoreService for ephemeral cross-server queues, matchmaking, auctions, or caches, not durable truth.
-- Use CollectionService tags only for discovery; convert tagged Instances into typed rule targets or ECS entities before gameplay logic.
+## Define semantics before syntax
 
-## Performance Impact
+Specify:
 
-- Declarative rules reduce duplicated feature scripts and branch-heavy shared services.
-- Prevalidate rule configs at load time, then cache resolved handlers for hot paths.
-- Keep condition checks cheap and ordered: reject impossible/cheap cases before expensive geometry, pathfinding, or datastore work.
-- Avoid allocating new rule context tables in tight loops where a pooled/context builder can be used safely.
-- Use batching for repeated target queries, effects, and replication deltas.
-- Do not run economy/persistence effects inside high-frequency simulation loops.
+- evaluation order and short-circuiting;
+- pure checks versus mutations;
+- cost reservation and commit;
+- failure/rejection vocabulary;
+- randomness and time source;
+- idempotency/retry behavior;
+- partial failure and compensation;
+- recursion/depth/work limits.
 
-## Mastery Topics
+Do not start by inventing a DSL. Typed tables/functions may be enough.
 
-1. Condition contracts.
-2. Cost contracts.
-3. Effect contracts.
-4. Target selector contracts.
-5. Cooldown and timing policies.
-6. Permission policies.
-7. Rule pipeline ordering.
-8. Transaction-backed rewards.
-9. Rule explainability and rejection reasons.
-10. Rule authoring tools and validators.
-11. Prevalidated hot-path rule handles.
-12. Rule context capability limits.
-13. Pure rule simulation for previews/tests.
-14. Rule diffs and migration support.
-15. Rule execution traces.
+## Suggested bounded flow
 
-## Extreme Usage Cases
-
-- A gun attachment declares modifiers, not custom weapon scripts.
-- A quest objective declares conditions and rewards, not bespoke completion code.
-- An ability declares targeting, costs, effects, and cooldowns.
-- A shop declares purchase rules and transaction outputs.
-- NPC actions use the same rule pipeline as player abilities.
-- Prompt interactions produce typed rule commands with server-owned rewards.
-
-## Best Case Scenario
-
-Most features are data plus small registered handlers:
-
-```lua
-{
-	id = "ArmorPiercingRounds",
-	conditions = {"WeaponEquipped", "AmmoAvailable"},
-	costs = {{kind = "Ammo", amount = 1}},
-	effects = {
-		{kind = "Damage", amount = 18},
-		{kind = "ArmorPierce", percent = 0.35},
-	},
-}
+```text
+parse/admit definition
+build request context
+run cheap structural/state checks
+run bounded expensive checks
+reserve required resources
+apply one authoritative domain mutation
+emit presentation/audit effects
 ```
 
-The rules engine validates, executes, logs, and rejects consistently.
+This is a possible transaction-shaped flow, not database atomicity. If effects span DataStore keys or external services, define idempotency and recovery explicitly.
 
-## Practice Project
+## Conditions and effects
 
-Build a rule engine for weapon abilities:
+Keep pure conditions free of side effects when possible; that allows preview and explanation. Effects should return explicit outcomes and avoid arbitrary full-world access.
 
-- `ConditionRegistry`
-- `CostRegistry`
-- `TargetSelectorRegistry`
-- `EffectRegistry`
-- `RuleValidator`
-- `RuleExecutor`
-- `RuleTrace`
+Ordering matters. Two individually valid effects may conflict. Test commutativity assumptions rather than assuming a list order is harmless.
 
-Acceptance standard:
+## Security
 
-You can add `ArmorPiercingRounds`, `StunShot`, and `HealPulse` by config plus registered effects without editing the shared executor by name.
+Client messages may request a rule/action ID and intent. The server resolves the authoritative definition and checks player/world state. Never accept client-supplied price, reward, cooldown completion, effect list, or target eligibility as truth.
 
-## Permanent Rule
+Bound definition size and evaluator work even for server-authored content so a bad config cannot freeze a server.
 
-Repeated `validate -> cost -> mutate -> reward` flows belong in a rules engine.
+## Performance
 
-## References
+Interpretation and generality cost CPU/allocations. Resolve IDs and validate static definitions at admission, cache only safe compiled forms, and profile representative rule counts. Do not remove dynamic state/security checks from requests.
 
-- Roblox Creator Hub: ModuleScript and reusable code.
-- Roblox Creator Hub: Remote events and callbacks.
-- Roblox Creator Hub: Data stores.
-- Roblox Creator Hub: Memory stores.
+## Practice project
+
+Build a purchase/interaction evaluator with:
+
+- three pure conditions;
+- two resource costs;
+- three effects;
+- typed rejection reasons;
+- preview that cannot mutate;
+- an idempotent authoritative commit;
+- depth/count limits;
+- tests for effect-order conflicts and partial failure.
+
+Then implement one unusual feature directly. If forcing it into the engine obscures the behavior, keep a domain-specific escape boundary or do not include it.
+
+## Completion evidence
+
+You understand this stage when you can:
+
+- justify declarative evaluation from content needs;
+- distinguish pure checks, reservation, commit, and presentation;
+- state ordering and partial-failure semantics;
+- prevent clients from authoring rules/outcomes;
+- bound interpreter work;
+- choose direct code when it is clearer.
+
+## Primary references
+
+- [Roblox client-server security](https://create.roblox.com/docs/scripting/security/client-server-boundary)
+- [Roblox data stores](https://create.roblox.com/docs/cloud-services/data-stores)
+- [Luau type system](https://luau.org/types/)

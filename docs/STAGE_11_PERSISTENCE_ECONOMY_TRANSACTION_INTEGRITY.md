@@ -1,522 +1,135 @@
-# Stage 11: Persistence, Economy Integrity, and Transaction Ledgers
+# Stage 11: Persistence and Economy Integrity
 
-Persistence is not just saving tables. Economy integrity is not just checking prices. In Roblox, persistent state is long-lived, player-facing, exploitable, failure-prone, and expensive to repair after corruption. Treat inventory, currency, ownership, unlocks, rewards, attachments, vehicles, progression, and purchases as authoritative ledgers.
+Persistent state outlives a server process, so failures, retries, old schemas, and concurrent writers are normal design inputs. Roblox DataStores are key-value storage, not a general relational database or multi-key ACID transaction system.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> Persistent gameplay state must change through validated, idempotent, auditable server transactions. Never mutate durable economy or inventory state casually.
+## Platform facts
 
-## 1. Profile Ownership
+- DataStore calls are asynchronous network operations that can fail and should be handled with `pcall` and an explicit policy.
+- `SetAsync()` can overwrite another server’s change.
+- `UpdateAsync()` reads and conditionally writes one key, may rerun its callback, consumes read and write budget, and its callback cannot yield.
+- `GetAsync()` may return cached/stale data in documented circumstances.
+- Standard DataStores retain version history for a limited period; OrderedDataStores have different data/feature constraints.
+- MemoryStore is cross-server but ephemeral and TTL-limited; it is not durable transaction evidence.
 
-Profile ownership means one server session owns the right to read/write a player's durable state.
+Recheck current limits and budgets before shipping.
 
-Apply it with:
+## Record ownership
 
-- profile session locks
-- load states
-- release on leave
-- timeout recovery
-- reconnect handling
-- save shutdown handling
+If one live server should mutate a player record, implement a session lease/lock protocol or use a reviewed profile library. This is application behavior, not an automatic DataStore guarantee.
 
-Used for:
+Define:
 
-- inventory
-- money
-- weapon ownership
-- attachments
-- vehicles
-- progression
-- job rewards
+- lease identity and expiry;
+- renewal and loss behavior;
+- stale-owner recovery;
+- teleport/rejoin overlap;
+- what gameplay does when ownership cannot be acquired;
+- shutdown and crash expectations.
 
-Practice:
+Never keep accepting durable mutations after the session knows it lost ownership.
 
-Design a `PlayerProfileSession` state machine: `Unloaded`, `Loading`, `Loaded`, `Saving`, `Released`, `Failed`.
+## Schema and migration
 
-Mastery rule:
+Each saved record should identify a schema version when shape can evolve. Migrations should be ordered, bounded, and tested from every supported version.
 
-No system may mutate durable player state before the profile is loaded and owned.
+Do not silently replace a corrupt/unknown record with defaults and save over it. Quarantine, alert, or preserve recoverable evidence according to product policy.
 
-## 2. Data Schemas
+Migration code should avoid yielding inside `UpdateAsync()` callbacks. Prepare external information before the callback or redesign the record transition.
 
-Persistent data needs explicit schemas and versions.
+## Application transactions
 
-Apply schemas for:
+For a change contained in one profile key, an application transaction can validate and return a new record inside one `UpdateAsync()` flow. For changes spanning multiple keys/services, atomic all-or-nothing commit is not provided automatically.
 
-- profile metadata
-- wallet balances
-- inventory items
-- weapon ownership
-- attachments
-- vehicles
-- progression
-- settings
-- audit records
+Use one or more of:
 
-Used for:
+- co-locate data that must commit together;
+- an idempotent transaction record/state machine;
+- reservations and finalization;
+- compensating actions;
+- reconciliation/repair jobs;
+- manual review for high-value exceptions.
 
-- migrations
-- validation
-- debugging
-- rollback recovery
-- safe feature rollout
+Call these application protocols, not guaranteed database atomicity.
 
-Practice:
+## Idempotency
 
-Create a typed profile schema with a `schemaVersion`, `wallet`, `inventory`, `weapons`, `vehicles`, and `transactionLedger`.
+An idempotency key prevents a repeated logical request from applying twice only if the duplicate record and mutation are checked/committed within a sufficiently durable authoritative boundary.
 
-Mastery rule:
+Define:
 
-If it is saved, it has a versioned schema.
+- key source and uniqueness scope;
+- retention length;
+- response for duplicate success, duplicate pending, and conflicting reuse;
+- storage growth/compaction;
+- behavior after partial failure.
 
-## 3. Migrations
+An in-memory “seen IDs” table does not protect across server crash or retry.
 
-Migrations transform old data into current shape.
+## Developer products
 
-Apply migrations as ordered, idempotent functions:
+Use `MarketplaceService.ProcessReceipt` for granting Developer Products. Do not grant from `PromptProductPurchaseFinished`; that event does not prove a successful purchase.
 
-```text
-v1 -> v2
-v2 -> v3
-v3 -> v4
-```
+Receipt handling must tolerate repeated delivery. Validate the player/product context, durably record/grant according to an idempotent policy, and return `PurchaseGranted` only when the grant is safely accounted for. Follow the current official receipt documentation rather than copying an old sample blindly.
 
-Used for:
+## Write scheduling and budgets
 
-- adding currencies
-- renaming weapon ids
-- changing attachment formats
-- splitting inventory records
-- adding audit ledgers
+Queue/coalesce writes when that preserves semantics, but define:
 
-Practice:
+- maximum pending work;
+- priority (purchases versus cosmetic settings);
+- retryable versus permanent failure;
+- exponential backoff/jitter where appropriate;
+- shutdown deadline behavior;
+- last-known durable version;
+- player-facing degraded behavior.
 
-Write a migration that converts `OwnedGuns = {"Rifle"}` into `Weapons = {Rifle = {owned = true, attachments = {}}}`.
+Do not retry every error forever. A retry queue is another bounded persistent-state machine.
 
-Mastery rule:
+## Caches
 
-Migrations must be repeat-safe and tested against real old shapes.
+A cache needs an owner, freshness rule, invalidation strategy, and authoritative backing source. Caching persistent records can introduce stale overwrites if two writers or old snapshots are allowed to save.
 
-## 4. Transaction Boundaries
+MemoryStore may support cross-server coordination/cache use, but values expire and calls can fail/throttle. Never treat it as the only record of a permanent purchase.
 
-Transactions define a complete state change.
+## Security and audit
 
-Apply this flow:
+Clients request purchases, rewards, crafting, or inventory changes; the server validates and commits. Audit evidence should be proportional to value and include transaction/receipt ID, source, player, outcome, and rejection/failure reason without exposing private full profiles.
 
-```text
-validate request -> validate profile -> validate cost -> reserve/debit -> mutate -> emit ledger event -> commit -> replicate result
-```
+An append-only “ledger” in a mutable profile is not automatically tamper-proof or unboundedly scalable. Define retention, reconciliation, and external support tooling.
 
-Used for:
+## Practice project
 
-- purchases
-- rewards
-- trading
-- crafting
-- ammo purchases
-- weapon unlocks
-- attachment installs
-- vehicle ownership
+Build a fake profile repository and purchase service that simulates:
 
-Practice:
+- duplicate requests and duplicate receipts;
+- two writers for one key;
+- `UpdateAsync` callback reruns;
+- throttle/timeouts;
+- server crash between reservation and finalization;
+- migration from each old schema;
+- loss of session ownership;
+- bounded retry queue overflow.
 
-Build a `PurchaseWeaponTransaction` that debits currency and grants ownership atomically.
+Then run a limited Studio/provider test. Keep fake-provider proof separate from live DataStore proof.
 
-Mastery rule:
+## Completion evidence
 
-Currency and items change together or not at all.
+You understand this stage when you can:
 
-## 5. Idempotency
+- state the single-key scope of `UpdateAsync`;
+- distinguish durable DataStore state from ephemeral MemoryStore coordination;
+- design and lose a session lease safely;
+- prove idempotency across retries/crashes for the chosen boundary;
+- process Developer Products through `ProcessReceipt`;
+- recover or escalate partial multi-service workflows without claiming ACID semantics.
 
-Idempotency means repeated requests do not duplicate outcomes.
+## Primary references
 
-Apply transaction ids:
-
-- purchase id
-- reward id
-- trade id
-- grant id
-- migration id
-- receipt id
-
-Used for:
-
-- duplicate remotes
-- retries
-- DataStore uncertainty
-- server crashes
-- purchase receipts
-- reward claims
-
-Practice:
-
-Send the same purchase request three times with the same transaction id. The player should be charged once and receive one weapon.
-
-Mastery rule:
-
-Every durable grant or debit needs a duplicate policy.
-
-## 6. Ledgers and Audit Events
-
-Ledgers record why durable state changed.
-
-Apply ledger records:
-
-- transaction id
-- player id
-- action
-- before/after summary
-- amount
-- item id
-- source system
-- timestamp/tick
-- result
-- reason
-
-Used for:
-
-- economy debugging
-- exploit investigation
-- refund tooling
-- rollback recovery
-- analytics
-- support review
-
-Practice:
-
-Record a ledger entry for every currency change, item grant, weapon purchase, and reward claim.
-
-Mastery rule:
-
-If value changed, there should be evidence explaining why.
-
-## 7. Write Budgets and Queues
-
-DataStore writes are limited and can fail.
-
-Apply:
-
-- coalesced saves
-- save queues
-- dirty flags
-- retry policy
-- shutdown flush
-- budget-aware scheduling
-- critical save priority
-
-Used for:
-
-- profiles
-- inventories
-- settings
-- match rewards
-- economy state
-- long sessions
-
-Practice:
-
-Create a save scheduler that coalesces profile writes and exposes queue length, last save time, retry count, and failure reason.
-
-Mastery rule:
-
-Persistence must be scheduled, not spammed.
-
-## 8. Conflict Handling
-
-Conflicts happen when data is stale, duplicated, or concurrently modified.
-
-Apply conflict policies:
-
-- reject stale transaction
-- replay ledger
-- merge safe fields
-- prefer server-owned session
-- require manual review
-- restore from backup
-
-Used for:
-
-- reconnects
-- server crashes
-- trades
-- cross-server grants
-- receipt processing
-- inventory corrections
-
-Practice:
-
-Simulate a stale purchase against an old profile version. Reject it or replay it through the ledger safely.
-
-Mastery rule:
-
-Never guess on durable conflicts. Use a named policy.
-
-## 9. Secure Reward Claims
-
-Rewards are high-value exploit targets.
-
-Validate:
-
-- profile loaded
-- source system
-- completion proof
-- reward eligibility
-- duplicate claim
-- cooldown/window
-- amount bounds
-- inventory capacity
-- transaction id
-
-Used for:
-
-- job rewards
-- heist payouts
-- mission rewards
-- combat rewards
-- daily rewards
-- quest completion
-
-Practice:
-
-Make a `RewardClaimed` transaction that can only be called by the authoritative session service, not directly by a client remote.
-
-Mastery rule:
-
-Clients request actions. Server systems grant rewards.
-
-## 10. Recovery and Repair Tooling
-
-Persistence systems need recovery tools.
-
-Apply tooling for:
-
-- profile dump
-- ledger lookup
-- transaction replay
-- rollback to checkpoint
-- manual grant/revoke
-- corruption detector
-- migration dry-run
-- economy audit
-
-Used for:
-
-- support
-- exploit cleanup
-- production incidents
-- migration safety
-- QA
-
-Practice:
-
-Build a dry-run migration command that reports what would change without writing.
-
-Mastery rule:
-
-If you cannot repair durable state, you are not ready to mutate it at scale.
-
-## Compatibility With ECS
-
-ECS runtime state and persistent state are not the same.
-
-Policy:
-
-> ECS owns live simulation. Persistence owns durable records. Synchronize through typed transactions, not table copying.
-
-## Compatibility With OOP
-
-OOP owns profile services, transaction services, save queues, and repair tools.
-
-Policy:
-
-> Durable mutation happens through narrow service APIs, never direct table edits from feature code.
-
-## Compatibility With Scheduling
-
-Persistence depends on time, retries, queues, and shutdown windows.
-
-Policy:
-
-> Save work must be scheduled, budget-aware, observable, and cancellable only where safe.
-
-## Compatibility With Runtime Contracts
-
-Persistence boundaries require runtime admission.
-
-Validate:
-
-- loaded profile state
-- transaction shape
-- schema version
-- migration input
-- reward eligibility
-- item ids
-- amount bounds
-
-Policy:
-
-> No unvalidated dynamic data enters durable state.
-
-## Compatibility With Typed Luau
-
-Typed Luau defines durable data and transactions.
-
-Use types for:
-
-- profile schema
-- inventory records
-- wallet records
-- transaction requests
-- transaction results
-- ledger entries
-- migration functions
-- save states
-
-Policy:
-
-> If it is saved or affects saved state, type it.
-
-## Compatibility With Networking
-
-Clients should not send durable mutations directly.
-
-Policy:
-
-> Network messages request intent. Server transaction services mutate persistence.
-
-## Compatibility With Rollback and Temporal Architecture
-
-Economy rollback is not combat rollback. Durable state needs ledger-based recovery.
-
-Policy:
-
-> Use ledgers and compensating transactions for durable recovery, not blind snapshot rewinds.
-
-## Compatibility With Anti-Cheat
-
-Economy anti-cheat is transaction validation.
-
-Policy:
-
-> Every currency, inventory, reward, weapon, attachment, and vehicle mutation must prove its source and eligibility.
-
-## Compatibility With Observability
-
-Persistence must be auditable.
-
-Policy:
-
-> Every durable mutation should be explainable by transaction id, source system, validation result, and ledger record.
-
-## Compatibility With Domain Platforms
-
-Domain platforms should call shared transaction services.
-
-Policy:
-
-> Weapons, prompts, jobs, vehicles, shops, and missions do not each invent persistence. They submit typed transactions to the durable-state platform.
-
-## For Gunkits
-
-Apply to:
-
-- weapon ownership
-- attachment ownership
-- ammo purchases
-- skin unlocks
-- rank unlocks
-- combat rewards
-- loadout saves
-
-Required platform pieces:
-
-```text
-WeaponOwnershipRecord
-AttachmentRecord
-LoadoutRecord
-PurchaseWeaponTransaction
-InstallAttachmentTransaction
-CombatRewardTransaction
-WeaponLedger
-LoadoutMigration
-```
-
-Policy:
-
-Gunkit runtime state may change quickly. Gunkit ownership state changes through durable transactions only.
-
-## For Prompt Systems
-
-Apply to:
-
-- shop purchases
-- job completion rewards
-- mission rewards
-- crafting results
-- loot crates
-- vehicle purchase prompts
-
-Policy:
-
-Prompt completion may trigger a transaction. The prompt itself does not directly mutate durable state.
-
-## For Vehicles
-
-Apply to:
-
-- vehicle ownership
-- upgrades
-- repair costs
-- impound fees
-- fuel purchases
-- garage loadouts
-
-Policy:
-
-Vehicle ownership and upgrades are durable economy records, not vehicle controller state.
-
-## The Indefinite Framework
-
-Your long-term Roblox framework should include:
-
-```text
-ProfileServiceAdapter
-ProfileSession
-SchemaVersion
-MigrationRunner
-TransactionService
-LedgerService
-WalletService
-InventoryService
-OwnershipService
-SaveScheduler
-ConflictPolicy
-RecoveryTooling
-EconomyAuditService
-```
-
-## How To Master It
-
-Practice in this order:
-
-1. Define a typed profile schema.
-2. Add schema versioning.
-3. Add profile session states.
-4. Add a transaction result type.
-5. Build one idempotent purchase transaction.
-6. Add ledger records.
-7. Add duplicate request handling.
-8. Add save queue scheduling.
-9. Add migration dry-run tests.
-10. Add conflict policy tests.
-11. Add reward eligibility validation.
-12. Add audit dump tooling.
-13. Add repair/replay tooling.
-14. Convert one prompt reward into a transaction.
-15. Convert one gunkit ownership change into a ledger-backed transaction.
-
-## Permanent Policy
-
-Use this rule for every future Roblox system:
-
-> If a state change survives server shutdown, it must be typed, validated, transactional, idempotent, and auditable.
+- [Roblox data stores](https://create.roblox.com/docs/cloud-services/data-stores)
+- [DataStore errors and limits](https://create.roblox.com/docs/cloud-services/data-stores/error-codes-and-limits)
+- [DataStore best practices](https://create.roblox.com/docs/cloud-services/data-stores/best-practices)
+- [Roblox memory stores](https://create.roblox.com/docs/cloud-services/memory-stores)
+- [Choosing Roblox cloud storage](https://create.roblox.com/docs/cloud-services/data-stores-vs-memory-stores)
+- [Roblox Developer Products](https://create.roblox.com/docs/production/monetization/developer-products)

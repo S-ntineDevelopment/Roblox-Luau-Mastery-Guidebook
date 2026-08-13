@@ -1,512 +1,130 @@
-# Stage 13: AI Behavior Architecture and NPC Systems
+# Stage 13: AI and NPC Systems
 
-AI systems become weak when every NPC is a pile of local scripts, random waits, direct Humanoid calls, and special-case combat logic. A serious Roblox engine needs AI as a domain platform: perception, memory, decision-making, actions, authority, scheduling, networking, debugging, and tooling all need explicit boundaries.
+NPC architecture depends on what the NPC can affect. A cosmetic crowd can be mostly client-side; a competitive combatant’s damage, rewards, and target eligibility need server authority. No single behavior formalism fits every NPC.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> NPCs are not special scripts. They are server-authoritative agents that perceive the world, choose actions through typed behavior contracts, execute through the same domain platforms as players where practical, and expose enough diagnostics to explain every decision.
+## Decide authority first
 
-## 1. AI Agent Identity
+Server-validated state is important when an NPC can:
 
-AI agents need stable identity separate from their Roblox Model.
+- damage or block players;
+- grant rewards or progression;
+- reveal hidden information;
+- affect competitive objectives;
+- own scarce world resources.
 
-Apply it with:
+Client-side simulation/presentation can be appropriate for ambient crowds, cosmetic animals, local animation, distant impostors, or predicted presentation where divergence has no authoritative impact.
 
-- `AgentId`
-- linked `EntityId`
-- model adapter
-- lifecycle owner
-- blackboard state
-- team/faction data
-- behavior profile id
+“NPCs are server-authoritative agents” is therefore too broad. Authoritative outcomes are server-owned; computation and presentation can be partitioned.
 
-Used for:
+## Separate concerns only as needed
 
-- NPC enemies
-- guards
-- civilians
-- vendors
-- bosses
-- police/criminal AI
-- vehicles
-- mission actors
+Useful conceptual parts include:
 
-Practice:
+- sensing/perception;
+- remembered state;
+- decision policy;
+- action execution;
+- movement/pathfinding adapter;
+- presentation/replication;
+- lifecycle and diagnostics.
 
-Spawn five NPCs from configs. Each gets an `EntityId`, `AgentId`, `Team`, `Health`, `Transform`, `BehaviorProfile`, and `ModelAdapter`.
+They can be functions/modules in one package. Do not create seven services for a simple guard NPC.
 
-Mastery rule:
+## Decision techniques
 
-The Roblox Model presents the agent. It is not the agent's identity.
+- **Finite state machine**: clear modes/transitions; good for small predictable behavior.
+- **Behavior tree**: hierarchical control flow and reusable nodes.
+- **Utility scoring**: choose among options based on scored context.
+- **Planner**: search action sequences toward goals.
+- **Direct rule code**: often clearest for a tiny closed behavior.
 
-## 2. Perception Systems
+These are alternatives and can be combined. A behavior tree is not automatically more scalable than a state machine; a planner can be expensive or unpredictable without bounded search.
 
-Perception decides what an NPC can sense.
+## Perception
 
-Apply perception channels:
+Perception is a gameplay model, not omniscient access to Workspace. Define sensor frequency, range, occlusion, team rules, memory duration, and uncertainty.
 
-- sight
-- hearing
-- damage source
-- proximity
-- threat
-- objective
-- team signals
-- memory recall
+Use spatial queries/raycasts deliberately and budget them. Do not rescan all descendants or recompute every line of sight every frame. Cache only with a freshness/invalidation policy.
 
-Used for:
+Keep hidden goals/threat data server-side when replication would enable cheating. But do not duplicate state secrecy work for cosmetic NPCs with no competitive information.
 
-- target detection
-- patrol interruption
-- combat response
-- stealth
-- alarms
-- squad behavior
+## Memory/blackboards
 
-Practice:
+A blackboard is one way to make working state inspectable. It can become an untyped dumping ground. Prefer named typed fields or domain records and define who writes each value and when it expires.
 
-Build a `PerceptionSystem` that writes `VisibleTargets` and `HeardEvents` components without directly choosing actions.
+Local variables are not inherently wrong. Promote state to a blackboard/store when multiple decisions/actions need it or diagnostics must inspect it.
 
-Mastery rule:
+## Actions
 
-Perception collects evidence. Decision systems choose behavior.
+Route authoritative effects through the same domain rules players use where semantics overlap: damage, inventory, interactions, cooldowns, and rewards. An NPC should not bypass validation merely because its command originates on the server.
 
-## 3. Blackboard Memory
+It may still use a trusted internal command path rather than pretending to be a networked player. Reuse rules, not unnecessary transport.
 
-A blackboard stores agent memory and working state.
+## Pathfinding and movement
 
-Apply blackboards for:
+Pathfinding is asynchronous and can fail. Define:
 
-- last seen target
-- last heard noise
-- current objective
-- squad alert state
-- path target
-- cover point
-- threat score
-- cooldowns
+- request budget/coalescing;
+- stale path rejection;
+- blocked/stuck handling;
+- target movement threshold for recompute;
+- streaming/world-change behavior;
+- cancellation on NPC destroy;
+- fallback behavior.
 
-Used for:
+Do not quote an invented universal pathfinding rate. Profile and observe the experience’s actual workload.
 
-- combat AI
-- patrols
-- investigation
-- squad coordination
-- boss phases
+Network ownership affects unanchored NPC physics. Choose ownership and validate gameplay consequences. Client ownership may improve responsiveness/performance but cannot be treated as trusted competitive movement.
 
-Practice:
+## Scheduling and scale
 
-Create a blackboard component with `lastKnownTargetPosition`, `alertLevel`, `currentGoal`, and `memoryExpiresAt`.
+One Heartbeat connection per NPC can be wasteful, but a single loop that updates every NPC every frame can also be wasteful. Use relevance, staggered updates, event-driven transitions, distance/interest bands, and batching according to behavior sensitivity.
 
-Mastery rule:
+Parallel Luau may help pure perception/scoring batches after profiling. It introduces Actor/VM state and synchronization costs; do not make it a prerequisite for “advanced” AI.
 
-AI memory should be explicit state, not hidden local variables inside behavior scripts.
+## Debugging
 
-## 4. Behavior Trees
+Useful decision evidence includes:
 
-Behavior trees organize decisions as selectors, sequences, conditions, and actions.
+- current mode/goal/action;
+- inputs considered and freshness;
+- utility scores or tree path;
+- path request/result age;
+- last rejection/failure;
+- time spent per stage.
 
-Apply them when behavior needs readable priority flow:
+Sample and bound histories. Debug tooling should not reveal hidden state to ordinary clients.
 
-```text
-Selector
-  Sequence: If low health -> find cover -> retreat
-  Sequence: If target visible -> aim -> fire
-  Sequence: If heard noise -> investigate
-  Action: patrol
-```
+## Practice project
 
-Used for:
+Implement one guard using a direct finite state machine. Then implement a utility-scored alternative for the same behavior. Test:
 
-- guards
-- enemies
-- bosses
-- mission NPCs
-- civilian routines
+- target appears/disappears;
+- path fails or becomes stale;
+- NPC destroys during a request;
+- 1, 50, and representative maximum NPC counts;
+- server-authoritative damage with client-side animation;
+- diagnostic explanation for each decision.
 
-Practice:
+Keep the more complex model only if it improves the desired behavior or authoring workflow.
 
-Build a small behavior tree runner with `Selector`, `Sequence`, `Condition`, and `Action` nodes.
+## Completion evidence
 
-Mastery rule:
+You understand this stage when you can:
 
-Behavior trees describe decision flow. Actions still execute through domain services.
+- choose authority per outcome instead of per “NPC” label;
+- select among direct rules, FSMs, trees, utility, and planning;
+- bound perception/pathfinding/scheduling work;
+- prevent stale async results after destroy or target change;
+- reuse authoritative domain rules without unnecessary network simulation;
+- explain an NPC decision from bounded runtime evidence.
 
-## 5. Utility AI
+## Primary references
 
-Utility AI scores possible actions and chooses the best one.
-
-Apply utility scoring for:
-
-- attack
-- retreat
-- reload
-- seek cover
-- chase
-- flank
-- call backup
-- investigate
-- idle
-
-Used for:
-
-- dynamic combat
-- vehicle NPCs
-- bosses
-- squad tactics
-- adaptive difficulty
-
-Practice:
-
-Score `Attack`, `Reload`, `Retreat`, and `TakeCover` from health, ammo, target distance, and visibility.
-
-Mastery rule:
-
-Utility AI is useful when the best action depends on changing context, not a fixed priority list.
-
-## 6. Planners and Goals
-
-Planners choose steps to satisfy a goal.
-
-Apply planning for:
-
-- fetch item
-- reach objective
-- breach building
-- arrest suspect
-- escape area
-- repair vehicle
-- defend point
-
-Used for:
-
-- mission NPCs
-- cops/criminals
-- workers
-- squad AI
-- open-world behaviors
-
-Practice:
-
-Design a simple goal planner where an NPC with goal `ReloadWeapon` can choose `FindCover -> Reload -> Reengage`.
-
-Mastery rule:
-
-Use planners when the path to a goal can vary. Use behavior trees when the decision hierarchy is stable.
-
-## 7. Action Contracts
-
-AI actions should use typed contracts and shared services.
-
-Apply actions:
-
-- `MoveTo`
-- `AimAt`
-- `FireWeapon`
-- `Reload`
-- `Interact`
-- `TakeCover`
-- `CallBackup`
-- `UseAbility`
-
-Used for:
-
-- player/NPC parity
-- testing
-- reuse
-- anti-cheat consistency
-- debugging
-
-Practice:
-
-Make NPC firing use the same server `WeaponPlatform` and `DamageTransactionService` as player weapons.
-
-Mastery rule:
-
-AI should not bypass the same authority rules players obey.
-
-## 8. Pathfinding and Movement Authority
-
-Movement AI must separate path planning, movement commands, and Roblox execution.
-
-Apply:
-
-- path request queue
-- movement intent component
-- path cache
-- stuck detection
-- steering/avoidance
-- humanoid adapter
-- server authority
-
-Used for:
-
-- patrols
-- chase
-- cover seeking
-- vehicles
-- civilians
-- enemy waves
-
-Practice:
-
-Create a `PathRequestService` with backpressure and a `HumanoidMovementAdapter` that executes movement without owning decision logic.
-
-Mastery rule:
-
-Pathfinding is expensive and failure-prone. Queue it, cache it, and inspect it.
-
-## 9. Squad and Group AI
-
-Group AI coordinates multiple agents.
-
-Apply group state:
-
-- squad id
-- shared target
-- alert level
-- formation
-- role
-- suppression target
-- flank assignment
-- retreat command
-
-Used for:
-
-- tactical combat
-- police squads
-- raids
-- boss minions
-- convoy systems
-
-Practice:
-
-Create a `SquadBlackboard` where one NPC spotting a player raises alert for nearby squad members.
-
-Mastery rule:
-
-Group coordination belongs in shared group state, not duplicated in every NPC brain.
-
-## 10. AI Debugging and Observability
-
-AI must explain decisions.
-
-Track:
-
-- current goal
-- selected action
-- score values
-- perception result
-- blackboard values
-- path status
-- failed conditions
-- action duration
-- target choice
-- last rejection reason
-
-Used for:
-
-- debugging NPC behavior
-- balancing
-- performance
-- anti-cheat parity
-- playtest tooling
-
-Practice:
-
-Build an AI debug dump for one NPC showing perception, blackboard, selected action, and reason.
-
-Mastery rule:
-
-If an NPC acts "stupid," the system should explain which input or score made it choose that action.
-
-## Compatibility With ECS
-
-AI state is ideal ECS data.
-
-Use components for:
-
-- `AIController`
-- `Perception`
-- `Blackboard`
-- `Goal`
-- `PathRequest`
-- `SquadMember`
-- `Targeting`
-- `Threat`
-
-Policy:
-
-> ECS stores AI state. AI systems process that state in declared phases.
-
-## Compatibility With OOP
-
-OOP owns AI services, adapters, and behavior runners.
-
-Use:
-
-- `BehaviorTreeRunner`
-- `UtilityScorer`
-- `PathRequestService`
-- `HumanoidAdapter`
-- `SquadService`
-- `AIDebugger`
-
-Policy:
-
-> OOP owns AI machinery. ECS owns AI state.
-
-## Compatibility With Scheduling
-
-AI needs budgeted execution.
-
-Policy:
-
-> AI perception, scoring, pathfinding, and actions must run through scheduler phases and budgets, not one Heartbeat per NPC.
-
-## Compatibility With Runtime Contracts
-
-AI extension points need validation.
-
-Policy:
-
-> Behavior nodes, utility actions, planners, and AI configs must be registered through typed contracts and runtime validators.
-
-## Compatibility With Typed Luau
-
-AI behavior must be typed.
-
-Use types for:
-
-- behavior nodes
-- action results
-- blackboard records
-- perception records
-- utility scores
-- path requests
-- squad commands
-
-Policy:
-
-> AI that cannot type its state cannot explain its behavior.
-
-## Compatibility With Networking
-
-AI is server-authoritative, but clients need presentation.
-
-Policy:
-
-> Replicate only client-needed AI presentation state. Keep decision state, hidden targets, threat scores, and future goals server-only unless explicitly allowed.
-
-## Compatibility With Anti-Cheat
-
-AI must not weaken combat authority.
-
-Policy:
-
-> NPC weapons and abilities use the same server validation, damage transactions, visibility rules, and audit logs as player systems where practical.
-
-## Compatibility With Persistence
-
-Most AI state is runtime-only, but some AI outcomes persist.
-
-Policy:
-
-> Persist outcomes such as rewards, quest progress, arrests, ownership, and economy changes through transactions. Do not persist volatile blackboard state unless the feature explicitly needs recovery.
-
-## For Gunkits
-
-AI gunkit integration requires:
-
-```text
-AIWeaponController
-TargetingComponent
-AimPolicy
-FireDecision
-ReloadDecision
-CombatValidationService
-DamageTransactionService
-ShotAuditLog
-```
-
-Policy:
-
-NPCs may choose to fire, but the weapon platform still validates cadence, ammo, target eligibility, line of sight, and damage.
-
-## For Prompt Systems
-
-AI prompt integration requires:
-
-```text
-AIInteractionIntent
-PermissionCheck
-PromptAction
-InteractionSession
-RewardTransaction
-```
-
-Policy:
-
-NPCs and players should use the same interaction contracts where the mechanic overlaps.
-
-## For Vehicles
-
-AI vehicle integration requires:
-
-```text
-VehicleGoal
-PathPlan
-DrivingPolicy
-VehicleInputCommand
-AuthorityHandoff
-CorrectionPolicy
-```
-
-Policy:
-
-AI drivers should emit vehicle input commands through the same vehicle platform instead of directly controlling physics internals.
-
-## The Indefinite Framework
-
-Your long-term Roblox framework should include:
-
-```text
-AIAgentRegistry
-PerceptionSystem
-BlackboardStore
-BehaviorTreeRunner
-UtilityScorer
-GoalPlanner
-ActionRegistry
-PathRequestService
-SquadService
-AIDebugger
-HumanoidAdapter
-AIConfigAuditor
-```
-
-## How To Master It
-
-Practice in this order:
-
-1. Give NPCs stable `AgentId` and `EntityId`.
-2. Add perception components.
-3. Add blackboard memory.
-4. Add behavior tree runner.
-5. Add utility scorer.
-6. Add typed action contracts.
-7. Make NPC firing use the weapon platform.
-8. Add path request queue and backpressure.
-9. Add humanoid adapter.
-10. Add squad blackboard.
-11. Add AI debug dumps.
-12. Add config validators.
-13. Add scheduler budgets.
-14. Add network interest filtering for AI presentation.
-15. Convert one scripted NPC into the AI platform.
-
-## Permanent Policy
-
-Use this rule for every future Roblox system:
-
-> AI is not exempt from architecture. NPCs must use the same identity, authority, lifecycle, validation, networking, and observability standards as the rest of the engine.
+- [Roblox PathfindingService](https://create.roblox.com/docs/reference/engine/classes/PathfindingService)
+- [Roblox character pathfinding](https://create.roblox.com/docs/characters/pathfinding)
+- [Roblox network ownership and physics](https://create.roblox.com/docs/scripting/security/network-ownership)
+- [Roblox Parallel Luau](https://create.roblox.com/docs/scripting/multithreading)
+- [Roblox performance guidance](https://create.roblox.com/docs/performance-optimization/improve)

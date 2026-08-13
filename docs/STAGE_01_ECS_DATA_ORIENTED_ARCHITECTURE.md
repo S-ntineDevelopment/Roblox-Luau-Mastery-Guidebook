@@ -1,341 +1,163 @@
-# Stage 1: ECS and Data-Oriented Architecture
+# Stage 1: ECS and Data-Oriented Design
 
-ECS means Entity Component System. It is a way to build game systems where identity, data, and behavior are separated:
+Entity Component System (ECS) is one architecture for representing many entities and applying shared operations to their data. It is not the definition of good Roblox architecture and it is not required for service/controller, feature-package, object-oriented, or functional codebases.
 
-- Entity: an id that represents a thing in the game.
-- Component: typed data attached to an entity.
-- System: logic that reads and writes components.
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-In Roblox, ECS is useful because most projects become tangled around Instances, RemoteEvents, ModuleScripts, and feature-specific managers. ECS gives you a shared architecture where combat, movement, inventory, effects, NPCs, and interactables can reuse the same rules for identity, lifecycle, querying, mutation, debugging, and replication.
+## Accurate model
 
-## 1. Entity Identity
+- **Entity**: identity within an ECS world, often an integer or opaque handle.
+- **Component**: data associated with an entity according to that ECS library’s rules.
+- **System**: code that selects entities/components and performs work.
+- **Query**: a way to select entities by component presence or other indexed criteria.
 
-Entity identity means every simulated thing has a stable id that is not just a Roblox Instance reference. A character, projectile, enemy, dropped item, ability zone, vehicle, or temporary effect can all be represented by an entity id.
+“Components contain no behavior” is a common data-oriented convention, not a universal ECS law. Follow the selected library’s contract. Plain data is especially helpful for inspection, replication, and snapshots.
 
-Apply it by creating an `EntityId` type and an entity registry. The registry should create ids, mark entities alive/dead, and own despawn cleanup.
+## When ECS is a good candidate
 
-Use it for:
+Consider ECS when several of these are true:
 
-- Combat targets.
-- NPCs.
-- Projectiles.
-- Inventory items.
-- Temporary status effects.
-- Interactables.
-- World objects that need simulation state.
+- many entities share the same operations;
+- behavior is determined by combinations of capabilities;
+- systems need cross-cutting queries;
+- bulk iteration or staged mutation is useful;
+- state needs snapshot, replay, or replication tooling;
+- adding combinations is harder than adding named classes or modules.
 
-Practice:
+Examples include dense projectile simulation, status effects across many combatants, large NPC crowds, or a replicated simulation with explicit snapshots.
 
-Build a tiny entity registry with `create`, `exists`, and `destroy`. Spawn 10 dummy entities for enemies, attach a display name separately, then destroy half of them and verify no system can act on destroyed ids.
+## When not to use it
 
-Roblox rule:
+Start with a ModuleScript, service/controller, or small object when:
 
-Do not let random systems pass raw `Model` or `Part` references everywhere as identity. Use an entity id as the stable simulation identity, and only map to Instances at the Roblox boundary.
+- the feature has few instances;
+- most behavior is unique rather than batch-oriented;
+- Roblox Instances already provide the needed identity and lifecycle;
+- the team would spend more time maintaining the ECS boundary than the feature;
+- the main work is UI flow, orchestration, or external service calls rather than entity processing.
 
-## 2. Component Schema Design
+A game can use ECS for one subsystem and ordinary modules elsewhere.
 
-Component schema design means each component is a small typed data record. Components should not contain behavior. They describe what an entity has, not what it does.
+## Identity and Roblox Instances
 
-Apply it by defining components like `Health`, `Position`, `Velocity`, `Team`, `Cooldowns`, `StatusEffects`, `Inventory`, or `Renderable`.
+A stable application ID is useful when identity must survive Instance replacement, cross a network/storage boundary, or refer to a logical object that has no Instance. It is not mandatory for every Part, GUI, or short-lived adapter.
 
-Use it for:
+Choose among:
 
-- Keeping feature data inspectable.
-- Making behavior reusable.
-- Avoiding huge object classes.
-- Making rollback snapshots easier.
-- Making network payloads easier to validate.
+- the Instance itself for local engine-bound work;
+- a string/number ID validated at a boundary;
+- an ECS entity handle for world-local identity;
+- a wrapper record when the type checker must distinguish ID domains.
 
-Practice:
+Do not promise that an ID is globally stable unless generation, reuse, lifetime, and serialization rules actually make it so.
 
-Create these typed components:
+## Component storage and “data locality”
+
+Tables keyed by entity can make ownership and batch iteration explicit:
 
 ```lua
-export type Health = {
-	current: number,
-	max: number,
-}
+type EntityId = number
+type Health = { current: number, maximum: number }
 
-export type Team = {
-	id: string,
-}
-
-export type Movement = {
-	speed: number,
-	direction: Vector3,
-}
+local healthByEntity: { [EntityId]: Health } = {}
 ```
 
-Then create three entities that combine them differently: a player, a turret, and a pickup.
+This can reduce object indirection and make queries or snapshots easier. However, Luau manages table layout and memory internally. A script cannot assume that separate tables are contiguous arrays or that a structure-of-arrays design produces a particular CPU-cache result.
 
-Roblox rule:
+The useful claim is narrower:
 
-If a table has methods, event connections, or Instance references, think carefully before calling it a component. Components should usually be serializable data.
+> Data-oriented organization can reduce work and allocations when it enables tighter iteration, smaller records, better indexing, or batching. Verify the effect with the MicroProfiler and representative cardinality.
 
-## 3. System Execution Order
+Algorithm choice usually matters before table-layout theory. Avoiding repeated scans, temporary allocation, serialization, or per-frame work often produces a clearer win.
 
-System execution order means the game updates in clear phases instead of depending on which Script happened to run first.
+## Systems, phases, and determinism
 
-Apply it by creating a scheduler with ordered phases such as:
+Declared phases can make ordering reviewable:
 
-1. Input.
-2. Command validation.
-3. Simulation.
-4. Collision/hit resolution.
-5. State commit.
-6. Replication.
-7. Presentation.
-
-Use it for:
-
-- Combat.
-- Movement.
-- Rollback.
-- Cooldowns.
-- AI.
-- Projectiles.
-- Status effects.
-
-Practice:
-
-Make three systems: `MovementSystem`, `DamageSystem`, and `DeathSystem`. Run them in a fixed order. Prove that death is only processed after damage, and movement does not run for dead entities on the next tick.
-
-Roblox rule:
-
-Do not spread core simulation behavior across unrelated `Heartbeat` connections. Route important game logic through one deliberate execution pipeline.
-
-## 4. Query Design
-
-Query design means systems need a clean way to find entities with specific components. For example, a movement system wants every entity with `Position` and `Velocity`.
-
-Apply it by building query helpers such as `world:query("Position", "Velocity")`. Start simple, then later optimize with cached views or archetypes.
-
-Use it for:
-
-- Finding damageable targets.
-- Updating moving entities.
-- Rendering health bars.
-- Applying status effects.
-- Finding interactables near a player.
-
-Practice:
-
-Create 100 entities with different component combinations. Write queries for:
-
-- Entities with `Health`.
-- Entities with `Health` and `Team`.
-- Entities with `Position` and `Interactable`.
-
-Print the counts and verify they match what you spawned.
-
-Roblox rule:
-
-Avoid using `workspace:GetDescendants()` as a gameplay query mechanism. Roblox tree search is useful at boundaries, not as your core simulation query model.
-
-## 5. Component Mutation Rules
-
-Component mutation rules define when and how component data can change. Without rules, systems overwrite each other and bugs become order-dependent.
-
-Apply it by deciding which systems can write each component. For risky flows, stage changes as commands or patches, then commit them after validation.
-
-Use it for:
-
-- Damage application.
-- Inventory transactions.
-- Currency changes.
-- Status effect changes.
-- Rollback replay.
-- Network reconciliation.
-
-Practice:
-
-Create a `DamageRequest` queue. Instead of directly changing `Health.current`, combat code submits damage requests. A single `DamageSystem` validates and applies them.
-
-Roblox rule:
-
-Never let both client UI code and server gameplay code mutate authoritative state directly. Presentation can request; authority validates and commits.
-
-## 6. Feature Composition
-
-Feature composition means behavior comes from component combinations rather than a giant class hierarchy.
-
-Apply it by building entities from capabilities:
-
-- `Health` makes something damageable.
-- `Team` makes it faction-aware.
-- `Inventory` makes it able to hold items.
-- `Interactable` makes it usable.
-- `AIController` makes it autonomous.
-
-Use it for:
-
-- Weapons.
-- Abilities.
-- NPC variants.
-- Items.
-- Vehicles.
-- Traps.
-- Doors.
-- Pickups.
-
-Practice:
-
-Build four entities from component combinations:
-
-- Damageable door: `Health`, `Interactable`.
-- Enemy NPC: `Health`, `Team`, `Movement`, `AIController`.
-- Healing pickup: `Position`, `Pickup`, `HealAmount`.
-- Turret: `Health`, `Team`, `Targeting`, `Weapon`.
-
-Then write systems that operate on components, not specific entity names.
-
-Roblox rule:
-
-Do not create a separate manager for every small variant. Prefer shared systems that react to component combinations.
-
-## 7. Data Locality
-
-Data locality means storing data in a way that is easy to iterate and process in batches. In Lua/Luau, this often means simple arrays or dictionaries organized by component type.
-
-Apply it by storing components in tables like:
-
-```lua
-local healthByEntity: {[EntityId]: Health} = {}
-local movementByEntity: {[EntityId]: Movement} = {}
+```text
+collect commands -> validate -> simulate -> commit -> replicate/present
 ```
 
-Use it for:
+An ordered scheduler does not by itself make a simulation deterministic. Results can still vary because of physics, floating-point behavior, unordered traversal, task timing, external APIs, or random input.
 
-- Performance.
-- Easier snapshots.
-- Efficient queries.
-- Clear ownership.
-- Batch updates.
+Use a fixed step only when the mechanic benefits from stable simulation intervals, prediction, replay, or bounded numerical behavior. UI, ordinary interactions, and most event-driven services do not need a fixed-tick ECS loop.
 
-Practice:
+## Mutation
 
-Make 1,000 movement entities and update them in one loop. Compare that to putting movement logic inside 1,000 separate objects with separate update connections.
+Direct component mutation can be adequate when one system clearly owns the write. Staged commands or deferred mutation are useful when:
 
-Roblox rule:
+- query iteration would be invalidated;
+- several producers submit changes to one authority;
+- validation must precede commit;
+- rollback or audit history needs an explicit command;
+- operation ordering must be testable.
 
-Do not create one `Heartbeat` connection per entity for core simulation. Prefer one system loop that updates many records.
+Do not build a command pipeline for every field assignment.
 
-## 8. Runtime Registration
+## Queries and discovery
 
-Runtime registration means components and systems are declared through one authoritative registry.
+An ECS query selects world data. Roblox discovery selects Instances. They are related but not identical.
 
-Apply it by requiring each component type to register its name, schema, defaults, and optional replication policy. Systems should register their phase and update function.
+- `CollectionService:GetTagged()` plus added/removed signals is useful for dynamic tagged discovery.
+- A bounded `GetChildren()` or even `GetDescendants()` during a controlled bootstrap can be reasonable for a known container.
+- Repeated whole-Workspace scans in gameplay hot paths are usually expensive and streaming-fragile.
 
-Use it for:
+After discovery, either keep an owned Instance registry or map the Instance to an entity when the ECS use case justifies it. Handle removal, destruction, and streaming explicitly.
 
-- Debugging.
-- Tooling.
-- Feature discovery.
-- Validation.
-- Replication rules.
-- System order control.
+## Update connections
 
-Practice:
+One RunService connection per object can be wasteful at scale, but one giant loop can also become a god scheduler. The relevant questions are work, cardinality, ownership, and cancellation.
 
-Create a component registry that can register:
+Reasonable options include:
 
-- `Health`
-- `Position`
-- `Velocity`
-- `Team`
+- event-driven logic with no frame loop;
+- a domain scheduler that batches similar work;
+- a small number of phase connections;
+- per-object connections for a small, independently owned set.
 
-Then reject duplicate component names and reject adding unregistered component types to entities.
+Measure before converting architecture solely to reduce connection count.
 
-Roblox rule:
+## Roblox integration
 
-Avoid scattered sibling config files for the same feature. Prefer one typed registration surface per component or feature.
+Instances are not merely presentation: they can be physics objects, characters, prompts, containers, and replicated engine state. An adapter is useful when it isolates streaming/lifetime behavior, engine calls, test doubles, or authoritative validation. It is unnecessary ceremony when a small module can safely own the Instance directly.
 
-## 9. ECS Debugging
+Attributes can be useful replicated scalar data. In Roblox’s current server-authority prediction model, documented attributes on predicted instances can participate in core synchronized simulation. Outside that model, decide who writes each attribute and do not assume a client-written value is trusted.
 
-ECS debugging means you can inspect entities, components, queries, and system timing without guessing through random scripts.
+## Practice project
 
-Apply it by building debug functions:
+Implement the same bounded scenario twice:
 
-- `world:dumpEntity(entityId)`
-- `world:listComponents(entityId)`
-- `world:count("Health")`
-- `world:traceSystemTimings()`
+1. a service/controller or functional version;
+2. a small ECS version.
 
-Use it for:
+Use 1,000 synthetic moving records and a smaller realistic set of Models. Compare:
 
-- Finding leaks.
-- Understanding combat bugs.
-- Debugging despawn issues.
-- Explaining state to yourself.
-- Building future Studio tooling.
+- code needed to add a new capability combination;
+- allocations and frame time under identical work;
+- cleanup after repeated spawn/despawn;
+- ease of inspecting one entity;
+- cost of mapping Instances to records;
+- test complexity.
 
-Practice:
+The goal is to explain which version fits, not to make ECS win.
 
-Create a command-line style debug module that prints one entity's full component state. Then add a system timing report that measures how long each system takes per update.
+## Completion evidence
 
-Roblox rule:
+You understand this stage when you can:
 
-If a system cannot explain its current state, it will become painful at scale. Debug visibility is part of architecture, not a luxury.
+- describe ECS without claiming it is universally superior;
+- identify a workload where queries/batching help and one where they do not;
+- distinguish data organization from proven hardware-level locality;
+- define entity and Instance lifetimes;
+- show a comparable measurement or explain why performance is not the deciding factor;
+- choose mutation and scheduling rules proportional to the feature.
 
-## 10. Roblox Integration
+## Primary references
 
-Roblox integration means deciding where ECS meets Roblox Instances, Attributes, CollectionService tags, Remotes, physics, UI, and replication.
+- [Luau performance](https://luau.org/performance/)
+- [Roblox performance optimization](https://create.roblox.com/docs/performance-optimization)
+- [CollectionService API](https://create.roblox.com/docs/reference/engine/classes/CollectionService)
+- [Roblox client-server runtime](https://create.roblox.com/docs/projects/client-server)
+- [Roblox server-authority model](https://create.roblox.com/docs/projects/server-authority)
 
-Apply it by keeping engine objects at the boundary:
-
-- Instances are presentation or engine-backed adapters.
-- Components are simulation data.
-- Systems bridge between simulation and Roblox APIs.
-
-Use it for:
-
-- Character models.
-- NPC models.
-- Tools.
-- Projectiles.
-- UI.
-- Effects.
-- Replication.
-- Studio-authored world objects.
-
-Practice:
-
-Tag several Parts with CollectionService as `Damageable`. On server start, scan those tagged Parts once, create ECS entities for them, attach `Health` and `RenderableModel` components, and store the Instance reference only in the Roblox adapter component.
-
-Roblox rule:
-
-Do not let every gameplay system directly crawl Workspace, mutate Attributes, fire Remotes, and manage effects. Keep Roblox API contact in adapter systems with clear authority boundaries.
-
-## Stage 1 Master Practice Project
-
-Build a small Roblox arena simulation with:
-
-- Players.
-- NPC enemies.
-- Damageable crates.
-- Pickups.
-- Projectiles.
-- Health.
-- Teams.
-- Movement.
-- Interactions.
-- Death/despawn.
-
-The goal is not visual polish. The goal is architecture.
-
-Required constraints:
-
-1. Every simulated object has an entity id.
-2. Gameplay data lives in components.
-3. Behavior lives in systems.
-4. Systems run in a declared order.
-5. Queries find entities by component sets.
-6. Damage is staged through requests.
-7. No entity owns its own Heartbeat connection.
-8. Components and systems are registered.
-9. You can dump any entity's state for debugging.
-10. Roblox Instances are integrated through boundary components or adapter systems.
-
-Completion standard:
-
-You understand Stage 1 when you can add a new entity type without creating a new manager, rewriting existing systems, or passing raw Instances through the whole game.
+ECS terminology varies by library. Consult the chosen library’s documentation before assuming archetype, query-cache, mutation, or entity-reuse semantics.

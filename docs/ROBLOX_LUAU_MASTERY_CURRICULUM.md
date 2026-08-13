@@ -1,258 +1,156 @@
-# Roblox Luau Mastery Curriculum
+# Roblox Luau Engineering Curriculum
 
-This project exists to turn advanced Luau and Roblox engineering practice into repeatable policy. The goal is not only to understand these concepts, but to implement them across every system: combat, inventory, UI, economy, world simulation, tools, NPCs, matchmaking, persistence, networking, and editor workflows.
+This curriculum teaches how to choose and verify Roblox/Luau engineering techniques. It does not prescribe ECS, OOP, dependency injection, rollback, code generation, or a domain platform for every feature.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) first. It defines which statements are platform facts, security requirements, recommendations, optional patterns, or experimental features.
 
-> Every system must separate data, behavior, lifecycle, authority, presentation, contracts, and cleanup. Feature code declares identity and domain behavior; shared architecture owns orchestration, validation, networking, scheduling, rollback, and enforcement.
+## Baseline principles
 
-## Stage 1: ECS and Data-Oriented Architecture
+1. The server validates client requests that affect shared, competitive, privileged, or durable state. Client code still legitimately owns input, camera, UI, and local presentation.
+2. Prefer the simplest design that satisfies the feature’s correctness, scale, testability, and team needs.
+3. Keep ownership and cleanup explicit when code creates resources that can outlive the current operation.
+4. Separate concerns where their authority, rate of change, runtime environment, or verification method differs. Do not split code merely to satisfy a diagram.
+5. Treat Roblox Instances as valid engine objects. Introduce adapters or stable IDs only where lifetime, streaming, serialization, testing, or cross-system identity makes that useful.
+6. Measure performance and networking changes with comparable workloads. Architecture vocabulary is not performance evidence.
 
-1. Entity identity: stable ids, lifecycle ownership, despawn semantics, and cross-system references.
-2. Component schema design: small typed data records with no hidden behavior.
-3. System execution order: deterministic update phases instead of incidental script ordering.
-4. Query design: efficient filtering, tags, archetypes, and cached views.
-5. Component mutation rules: controlled writes, staged changes, and event-safe updates.
-6. Feature composition: behavior emerges from components rather than inheritance chains.
-7. Data locality: designing state for batch processing and predictable iteration.
-8. Runtime registration: typed component and system registries.
-9. ECS debugging: entity inspectors, component diffs, and system timing traces.
-10. Roblox integration: mapping Instances, Attributes, CollectionService tags, and replicated state into ECS boundaries.
+The earlier blanket statement that feature code only declares identity/domain behavior while shared architecture owns everything else was too broad. That split is useful for a genuinely reused platform, but a cohesive feature package may correctly own its orchestration, validation, networking adapter, and lifecycle. Responsibility follows authority, cohesion, volatility, and reuse—not the label “feature” or “shared.”
 
-## Stage 2: OOP, Composition, and Polymorphic Dispatch
+## Stage 1: ECS and Data-Oriented Design
 
-1. Metatable class patterns: constructors, methods, private state, and object identity.
-2. Interface-by-contract design: documenting and enforcing expected method surfaces.
-3. Composition over inheritance: capabilities, delegates, traits, and injected collaborators.
-4. Polymorphic dispatch: replacing feature-name conditionals with object behavior.
-5. Dependency injection: explicit services, test doubles, and dependency boundaries.
-6. Lifecycle methods: init, start, pause, resume, destroy, and ownership transfer.
-7. Object pooling: reuse policies for projectiles, effects, UI rows, and transient objects.
-8. Error boundaries: defensive object APIs that fail early with useful diagnostics.
-9. Service object design: single-purpose services instead of omniscient managers.
-10. Roblox object adapters: wrapping Instances without leaking engine details through the whole codebase.
+Learn entities, components, systems, indexed stores, queries, update phases, and batch processing. Then decide whether the feature’s entity count and cross-cutting operations justify ECS.
+
+Important correction: Luau tables do not give scripts direct control over CPU cache layout. Organizing data by component can improve iteration, querying, allocation behavior, and snapshots, but “data locality” is not a guaranteed low-level optimization in Luau. Profile the real workload.
+
+See [Stage 1](STAGE_01_ECS_DATA_ORIENTED_ARCHITECTURE.md).
+
+## Stage 2: Objects, Composition, and Polymorphism
+
+Learn table/metatable object patterns, module APIs, resource ownership, composition, and multiple forms of polymorphic dispatch.
+
+Important corrections:
+
+- Composition and polymorphism are compatible. Inheritance is an `is-a` reuse relationship; composition is a `has-a` relationship; polymorphism is the ability to use different implementations through a common operation.
+- Dependency injection can be as small as passing a clock or callback into a function. It works in closed-source gameplay code and does not require a container or external provider.
+- Lifecycle operations are domain-specific. `destroy` is useful for an owner of disposable resources; `pause` and `resume` only belong where those states have defined semantics.
+- Pooling is a measured optimization, not a default object feature.
+
+See [Stage 2](STAGE_02_OOP_COMPOSITION_POLYMORPHIC_DISPATCH.md).
 
 ## Stage 3: Coroutines, Scheduling, and Async Control Flow
 
-1. Coroutine fundamentals: yield/resume semantics, error propagation, and cancellation gaps.
-2. Task ownership: every async task has an owner and a cleanup path.
-3. Custom schedulers: frame queues, priority queues, delayed jobs, and budgeted execution.
-4. Promise-style flows: success, failure, timeout, cancellation, and composition.
-5. Deterministic stepping: simulation ticks separated from render frames.
-6. Backpressure: preventing unbounded task.spawn, event fanout, and retry storms.
-7. Debounce vs throttle vs cooldown: explicit timing policies per feature.
-8. Cleanup containers: Janitor/Maid/Trove-style resource ownership.
-9. Async testing: fake clocks, controlled yields, and deterministic task flushing.
-10. Roblox scheduler integration: RunService phases, task library behavior, and network/event timing.
+Learn yielding, task scheduling, cancellation, timeouts, event-driven work, queues, and ownership. Use custom schedulers or Promise libraries only when their semantics solve a real coordination problem.
 
-## Stage 4: Metatables, Proxies, and Runtime Contracts
+See [Stage 3](STAGE_03_COROUTINES_SCHEDULING_ASYNC_CONTROL_FLOW.md).
 
-1. __index and __newindex: controlled reads, writes, and method lookup.
-2. Proxy tables: read-only views, write guards, lazy access, and instrumentation.
-3. Runtime type guards: validating data at trust boundaries.
-4. Contract assertions: preconditions, postconditions, and invariant checks.
-5. API capability tokens: exposing only the operations a caller is allowed to perform.
-6. Sandboxed environments: limiting access for plugin-style modules or user-authored behavior.
-7. Reactive tables: change observation without uncontrolled mutation.
-8. Debug instrumentation: tracing access, mutation, and slow-path behavior.
-9. Serialization-safe objects: separating runtime behavior from transferable data.
-10. Contract performance: removing or reducing runtime guards in hot paths safely.
+## Stage 4: Metatables, Proxies, and Runtime Validation
 
-## Stage 5: Typed Luau Architecture and Static Contracts
+Learn method lookup, proxies, table freezing, validators, capability-shaped APIs, and the limits of same-VM “sandboxing.” Runtime validation is essential at untrusted boundaries; proxies and metatables are optional implementation tools.
 
-1. Strict mode discipline: making `--!strict` the default for shared code.
-2. Structural typing: using shape-based contracts intentionally.
-3. Generic modules: typed containers, registries, resources, and event buses.
-4. Branded ids: distinguishing PlayerId, EntityId, ItemId, MatchId, and similar values.
-5. Network schemas: typed RemoteEvent and RemoteFunction payload definitions.
-6. Service contracts: explicit public APIs separated from private implementation.
-7. Type-safe configuration: one authoritative typed config surface per feature.
-8. Result types: success/failure returns instead of ambiguous nil/error patterns.
-9. Type narrowing: discriminated unions for feature modes and state machines.
-10. Type-driven refactors: using the checker to move behavior without losing correctness.
+See [Stage 4](STAGE_04_METATABLES_PROXIES_RUNTIME_CONTRACTS.md).
 
-## Stage 6: Rollback Netcode, Prediction, and Reconciliation
+## Stage 5: Typed Luau and Static Contracts
 
-1. Server authority: the server owns truth while clients predict responsiveness.
-2. Input commands: compact, timestamped, sequence-numbered input records.
-3. Fixed tick simulation: deterministic state progression independent from render frames.
-4. State snapshots: compact capture, restore, diff, and compression strategies.
-5. Client prediction: local simulation before server confirmation.
-6. Server reconciliation: correcting client state with minimal visual disruption.
-7. Rollback and replay: rewinding to a trusted frame and replaying pending inputs.
-8. Lag compensation: server-side historical hit validation for latency-sensitive actions.
-9. Presentation smoothing: interpolation, extrapolation, and correction blending.
-10. Anti-cheat constraints: validating inputs, rate limits, impossible movement, and authority violations.
+Learn gradual typing, strict mode, structural types, generics, tagged unions, result types, refinements, and runtime-validator pairing. Types improve tooling; they do not make remote input trusted or runtime tables immutable.
 
-## Chapter 7: Deterministic Simulation and Temporal Architecture
+See [Stage 5](STAGE_05_TYPED_LUAU_ARCHITECTURE_STATIC_CONTRACTS.md).
 
-1. Deterministic math policy: avoiding nondeterministic floating-point and random behavior where rollback depends on repeatability.
-2. Seeded random streams: domain-specific RNG streams for combat, loot, AI, and procedural systems.
-3. Fixed-point approximations: when stable numeric behavior matters more than convenience.
-4. Simulation clocks: separating real time, server time, client time, render time, and tick time.
-5. Temporal state machines: state transitions driven by ticks and events instead of loose waits.
-6. Event sourcing: recording commands and domain events as the basis for replay and auditing.
-7. Snapshot delta encoding: storing only meaningful state changes between frames.
-8. Deterministic physics boundaries: deciding when Roblox physics is presentation, authority, or approximation.
-9. Replay tooling: deterministic test replays for combat, movement, economy, and NPC behavior.
-10. Time-travel debugging: inspecting historical states and reproducing desyncs.
+## Stage 6: Prediction, Reconciliation, Lag Compensation, and Rollback
 
-See [Stage 7: Deterministic Simulation and Temporal Architecture](STAGE_07_DETERMINISTIC_SIMULATION_TEMPORAL_ARCHITECTURE.md) for the full practice guide.
+These are separate latency-management techniques with different costs. Most games need only some of them. Fixed-step code is not automatically deterministic, and Roblox physics should not be assumed replay-deterministic.
 
-## Chapter 8: Network Architecture, Replication, and Security
+See [Stage 6](STAGE_06_ROLLBACK_NETCODE_PREDICTION_RECONCILIATION.md).
 
-1. Trust boundaries: defining which data can originate from clients and which never can.
-2. Remote protocol design: versioned message names, schemas, ids, and rate policies.
-3. Replication layers: separating engine replication, custom replication, and presentation replication.
-4. Interest management: sending only relevant world state to each client.
-5. Bandwidth budgeting: per-feature network budgets and compression strategies.
-6. Authority handoff: controlled ownership transitions for vehicles, physics objects, and temporary simulations.
-7. Secure command validation: proving an action is legal before applying it.
-8. Abuse-resistant cooldowns: server-side cooldowns, input windows, and spam mitigation.
-9. Desync detection: checksums, divergence reports, and reconciliation diagnostics.
-10. Protocol migration: keeping old and new clients compatible during staged rollout.
+## Stage 7: Simulation Time, History, and Replay
 
-See [Stage 8: Network Architecture, Replication, and Security](STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md) for the full practice guide.
+Learn clocks, fixed steps, event records, snapshots, seeded randomness, and replay boundaries. Distinguish repeatable application logic from engine physics and cross-device numerical determinism.
 
-## Chapter 9: Runtime Systems, Tooling, and Observability
+See [Stage 7](STAGE_07_DETERMINISTIC_SIMULATION_TEMPORAL_ARCHITECTURE.md).
 
-1. Diagnostics architecture: logs, traces, counters, timings, and structured error reports.
-2. Feature flags: controlled rollout, kill switches, and experiment boundaries.
-3. Hot reload boundaries: safe reloadable modules versus stateful runtime services.
-4. Memory profiling: leak detection, object lifetime reports, and connection tracking.
-5. Performance budgets: frame time, memory, network, DataStore, and replication targets.
-6. System health dashboards: live views for services, queues, entities, and remote traffic.
-7. Automated contract tests: validating service APIs, schemas, and lifecycle guarantees.
-8. Fuzz testing: randomized command sequences for inventories, combat, trading, and rollback.
-9. Editor tooling: Roblox Studio plugins, inspectors, generators, and validation panels.
-10. Failure injection: simulating latency, packet loss, datastore failure, and partial service outages.
+## Stage 8: Networking, Replication, and Security
 
-See [Stage 9: Runtime Systems, Tooling, and Observability](STAGE_09_RUNTIME_SYSTEMS_TOOLING_OBSERVABILITY.md) for the full practice guide.
+Learn Roblox’s built-in replication, RemoteEvents, RemoteFunctions, UnreliableRemoteEvents, validation, rate limiting, network ownership, relevance filtering, and protocol evolution. Do not add custom replication merely because it appears more advanced.
 
-## Chapter 10: Large-Scale Game Architecture and Domain Platforms
+See [Stage 8](STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md) and the [Networking Ladder](NETWORKING_MASTERY_LADDER.md).
 
-1. Modular feature platforms: shared rules engines that features configure instead of rewriting.
-2. Domain-specific languages: declarative ability, item, quest, dialogue, and enemy behavior definitions.
-3. Rules engines: composing conditions, effects, costs, cooldowns, targeting, and validation.
-4. Data pipelines: importing, validating, versioning, and deploying gameplay data.
-5. Persistence architecture: profile ownership, migrations, conflict handling, and write budgets.
-6. Economy integrity: transaction ledgers, idempotency, rollback, fraud resistance, and audit trails.
-7. Match/session orchestration: lifecycle, matchmaking, server reservation, reconnect, and cleanup.
-8. AI behavior architecture: behavior trees, utility AI, planners, blackboards, and perception systems.
-9. Plugin-grade extensibility: capabilities, sandboxing, extension points, and backwards-compatible APIs.
-10. Cross-project policy extraction: turning proven patterns into templates, checklists, and reusable system contracts.
+## Stage 9: Runtime Tooling and Observability
 
-See [Stage 10: Large-Scale Game Architecture and Domain Platforms](STAGE_10_LARGE_SCALE_GAME_ARCHITECTURE_DOMAIN_PLATFORMS.md) for the full practice guide.
+Learn focused logging, metrics, profiling, tracing, failure injection, and lifecycle inspection. Instrumentation must have bounded cost, privacy rules, and a decision it supports.
 
-## Specialty Chapter: Gunkit Anti-Cheat, Aimlock, Aimbot, and ESP Prevention
+See [Stage 9](STAGE_09_RUNTIME_SYSTEMS_TOOLING_OBSERVABILITY.md).
 
-1. Threat model discipline: assume the client can inspect, spoof, automate, and spam.
-2. Server-authoritative hit validation: clients send intent, servers decide hits and damage.
-3. Information minimization: do not replicate combat data the client does not need.
-4. Visibility and line-of-sight authority: server geometry and rules decide valid targeting.
-5. Aim sanity and human-limit heuristics: detect abnormal patterns without overclaiming proof.
-6. Input and fire cadence validation: server owns fire rate, reload, ammo, and sequence.
-7. Remote protocol hardening: schemas, rate limits, sequence numbers, payload bounds, and fuzz tests.
-8. Lag compensation without trust: bounded historical validation using server-owned state.
-9. ESP-resistant UI and marker design: server-filtered nameplates, markers, health bars, and outlines.
-10. Audit, replay, and evidence: every rejection or suspicious shot should be explainable.
-11. Possibility bounds: compare shots against server-known physical, weapon, visibility, recoil, and timing limits.
-12. Likelihood scoring: accumulate repeated low-probability events instead of overreacting to one suspicious shot.
-13. Counterfactual replay: test suspicious hits against strict, lag-compensated, and maximum-tolerance histories.
-14. Behavioral baselines: compare current aim behavior against session history and population expectations.
-15. Detection response ladder: protect state first, escalate punishment only with high-confidence repeated evidence.
+## Stage 10: Scaling Architecture and Domain Platforms
 
-## Stage 11: Persistence, Economy Integrity, and Transaction Ledgers
+Learn when repeated, stable domain rules justify a shared platform. Duplication alone does not prove the right abstraction; extract after understanding meaningful variation.
 
-1. Profile ownership: one server session owns durable player state at a time.
-2. Data schemas: saved state has typed, versioned records.
-3. Migrations: old data upgrades through ordered, idempotent transforms.
-4. Transaction boundaries: durable changes validate, mutate, audit, and commit as one unit.
-5. Idempotency: retries and duplicate requests do not duplicate rewards or charges.
-6. Ledgers and audit events: every value change records why it happened.
-7. Write budgets and queues: DataStore work is scheduled, coalesced, retried, and observable.
-8. Conflict handling: stale or concurrent durable changes use named policies.
-9. Secure reward claims: clients never directly grant durable rewards.
-10. Recovery and repair tooling: durable state can be audited, replayed, migrated, and repaired.
+See [Stage 10](STAGE_10_LARGE_SCALE_GAME_ARCHITECTURE_DOMAIN_PLATFORMS.md).
 
-See [Stage 11: Persistence, Economy Integrity, and Transaction Ledgers](STAGE_11_PERSISTENCE_ECONOMY_TRANSACTION_INTEGRITY.md) for the full practice guide.
+## Stage 11: Persistence and Economy Integrity
 
-## Stage 12: Utility Architecture and Engine Foundation
+Learn DataStore constraints, single-key `UpdateAsync`, session ownership, schema migration, idempotent receipt handling, write budgets, recovery, and audit evidence. Do not describe application-level transaction coordinators as database-level atomicity.
 
-1. Utility ownership and taxonomy: utilities are categorized by purpose and owner.
-2. Core primitives: ids, results, readonly views, assertions, and small typed helpers.
-3. Lifecycle utilities: cleaners, task owners, operation handles, pools, and disposable contracts.
-4. Registry utilities: typed extension registries for components, systems, actions, effects, and schemas.
-5. Validation utilities: shared runtime admission vocabulary for remotes, configs, buffers, and persistence.
-6. Scheduler and time utilities: clocks, fake clocks, ticks, cooldowns, throttles, queues, and backpressure.
-7. Network utility layer: schema registries, remote adapters, rate limiters, sequence trackers, and codecs.
-8. Diagnostics and debug utilities: structured traces, counters, health reports, and debug commands.
-9. Test and fuzz utilities: fake services, replay harnesses, fuzz generators, and fixtures.
-10. Roblox adapter utilities: Tools, prompts, tags, remotes, RunService, Attributes, and physics ownership boundaries.
-11. Compatibility layers: stable contracts around volatile services and implementation details.
-12. Networking compatibility layers: gameplay depends on protocol APIs, not raw remotes or transport details.
-13. Caching compatibility layers: cache ownership, invalidation, TTL, freshness, and backing provider stay isolated.
-14. Persistence compatibility layers: domain systems submit transactions while repositories hide storage providers.
-15. Runtime environment compatibility layers: server/client/Studio/test differences stay behind context adapters.
+See [Stage 11](STAGE_11_PERSISTENCE_ECONOMY_TRANSACTION_INTEGRITY.md).
 
-See [Stage 12: Utility Architecture and Engine Foundation](STAGE_12_UTILITY_ARCHITECTURE_ENGINE_FOUNDATION.md) for the full practice guide.
+## Stage 12: Utilities and Engine Foundations
 
-## Stage 13: AI Behavior Architecture and NPC Systems
+Learn how to identify genuinely reusable primitives without building wrapper layers for their own sake. A direct Roblox API call behind a well-owned module can be better than an abstract interface that has one implementation and no testing seam.
 
-1. AI agent identity: stable ids, model adapters, lifecycle, team, and behavior profile.
-2. Perception systems: sight, hearing, damage, proximity, threat, objective, and memory signals.
-3. Blackboard memory: explicit agent memory and working state.
-4. Behavior trees: priority flow through selectors, sequences, conditions, and actions.
-5. Utility AI: scoring actions from context.
-6. Planners and goals: variable paths to goal completion.
-7. Action contracts: NPC behavior executes through typed shared services.
-8. Pathfinding and movement authority: queues, adapters, backpressure, and stuck handling.
-9. Squad and group AI: shared group state and coordination.
-10. AI debugging and observability: decision traces, perception dumps, scores, and path status.
+See [Stage 12](STAGE_12_UTILITY_ARCHITECTURE_ENGINE_FOUNDATION.md).
 
-See [Stage 13: AI Behavior Architecture and NPC Systems](STAGE_13_AI_BEHAVIOR_NPC_SYSTEMS.md) for the full practice guide.
+## Stage 13: AI and NPC Systems
 
-## Stage 14: Contract-First Feature Architecture
+Learn perception, state, decisions, actions, movement, scheduling, and debugging. Behavior trees, utility scoring, planners, and state machines are alternatives that can also be combined; no NPC needs all of them. Competitive outcomes need server validation, while cosmetic NPC presentation can be client-side.
 
-Shared systems define contracts first; feature packages only supply identity, config, and domain behavior.
+See [Stage 13](STAGE_13_AI_BEHAVIOR_NPC_SYSTEMS.md).
 
-See [Stage 14: Contract-First Feature Architecture](STAGE_14_CONTRACT_FIRST_FEATURE_ARCHITECTURE.md).
+## Stage 14: Contract-First Feature Design
+
+Learn stable module boundaries and extension points. A registry is useful for an open set of plugins or data-defined behaviors; a direct conditional can be clearer and safer for a small closed set.
+
+See [Stage 14](STAGE_14_CONTRACT_FIRST_FEATURE_ARCHITECTURE.md).
 
 ## Stage 15: Rules Engines and Declarative Gameplay
 
-Gameplay is composed from validated conditions, costs, effects, targeting, cooldowns, permissions, and rewards.
+Learn when gameplay data benefits from a validated evaluator. Avoid turning straightforward domain code into an untyped general-purpose interpreter.
 
-See [Stage 15: Rules Engines and Declarative Gameplay](STAGE_15_RULES_ENGINES_AND_DECLARATIVE_GAMEPLAY.md).
+See [Stage 15](STAGE_15_RULES_ENGINES_AND_DECLARATIVE_GAMEPLAY.md).
 
-## Stage 16: Source Generation, Templates, and Static Analysis
+## Stage 16: Templates, Code Generation, and Static Analysis
 
-Repeated architecture patterns become generators, templates, audits, and static checks.
+Learn what tooling can prove and what remains a runtime or Studio concern. Linters can enforce syntax and detectable project rules; they cannot generally prove authority, cleanup, security, or semantic correctness.
 
-See [Stage 16: Source Generation, Templates, and Static Analysis](STAGE_16_SOURCE_GENERATION_TEMPLATES_AND_STATIC_ANALYSIS.md).
+See [Stage 16](STAGE_16_SOURCE_GENERATION_TEMPLATES_AND_STATIC_ANALYSIS.md).
 
-## Stage 17: Parallelism, Actor Model, Bulk Movement, and Scalability
+## Stage 17: Parallel Luau and Scalability
 
-Parallel work uses ownership boundaries, immutable snapshots, message passing, and deterministic merge phases.
+Learn Actors, serial/parallel phases, thread-safety tags, VM isolation, SharedTables, messages, batching, and profiling. Parallelism is optional and may be slower for small or synchronization-heavy work.
 
-See [Stage 17: Parallelism, Actor Model, and Scalability](STAGE_17_PARALLELISM_ACTOR_MODEL_AND_SCALABILITY.md).
+See [Stage 17](STAGE_17_PARALLELISM_ACTOR_MODEL_AND_SCALABILITY.md).
 
-## Stage 18: Release Engineering, Versioning, and LiveOps
+## Stage 18: Release Engineering and LiveOps
 
-Production systems need versioning, rollout, rollback, observability, migration, and deprecation policy.
+Learn place versions, feature/config rollout, schema and protocol compatibility, rollback plans, migrations, telemetry, and cleanup. The amount of machinery should be proportional to release risk.
 
-See [Stage 18: Release Engineering, Versioning, and LiveOps](STAGE_18_RELEASE_ENGINEERING_VERSIONING_AND_LIVEOPS.md).
+See [Stage 18](STAGE_18_RELEASE_ENGINEERING_VERSIONING_AND_LIVEOPS.md).
 
-## Implementation Rule
+## Specialty: Combat Security
 
-For every future Roblox system, ask:
+Learn authoritative validation, information limits, lag-tolerant hit checks, network-ownership risk, evidence quality, and conservative enforcement. Client-side anti-cheat cannot be trusted, ESP cannot be eliminated for already replicated information, and statistical anomalies are not proof by themselves.
 
-1. What is the authoritative state?
-2. Which side owns it: server, client, or shared simulation?
-3. What are the typed contracts?
-4. What is the lifecycle and cleanup path?
-5. What is predicted, replicated, reconciled, or rolled back?
-6. What is data, what is behavior, and what is presentation?
-7. What can be tested deterministically?
-8. What can fail, be abused, desync, leak, or overload?
-9. What tooling proves the system is healthy?
-10. What reusable policy should this system contribute back to the curriculum?
+See [Gunkit Anti-Cheat Specialty](SPECIALTY_GUNKIT_ANTI_CHEAT_AIMLOCK_AIMBOT_ESP_PREVENTION.md).
+
+## Design review questions
+
+For a new system, ask:
+
+1. What outcome must be correct, and who can attack or invalidate it?
+2. Which state is authoritative, predicted, cached, presented, or durable?
+3. What is the smallest API and data model that fits the feature?
+4. Which resources outlive a call, and who releases or invalidates them?
+5. Which inputs are dynamic or untrusted and therefore need runtime validation?
+6. What scale and latency does the feature actually need to support?
+7. Which engine behavior is documented, and which behavior still needs a Studio/runtime test?
+8. What evidence would falsify the design assumption?
+9. Is the proposed abstraction cheaper than direct code over the expected lifetime?
+10. Which checks can run statically, and which require live, visual, networked, or long-duration proof?
+
+Use the [Scripter Ranking Rubric](SCRIPTER_RANKING_RUBRIC.md) as an evidence rubric, not a line-count target.

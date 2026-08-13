@@ -1,536 +1,124 @@
-# Stage 10: Large-Scale Game Architecture and Domain Platforms
+# Stage 10: Scaling Architecture and Domain Platforms
 
-Large-scale architecture is what turns individual systems into a reusable game platform. At this level, the goal is not to build one gunkit, one prompt framework, one vehicle controller, or one economy module. The goal is to build domain platforms that can generate, validate, run, inspect, and evolve many systems across projects.
+A domain platform is shared infrastructure for a family of related features, such as weapons, quests, vehicles, or purchases. It is valuable after the domain’s stable rules and meaningful variations are understood. It is not a maturity badge that every codebase must build.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> A mature Roblox codebase should not repeatedly rebuild the same kind of system. It should provide platforms where features declare identity, config, rules, and domain behavior while shared architecture owns validation, lifecycle, networking, persistence, observability, and tooling.
+## When to extract a platform
 
-## 1. Modular Feature Platforms
+Evidence for extraction includes:
 
-Feature platforms are reusable systems that many features plug into.
+- several features repeat the same correctness/security rules;
+- bugs recur because each feature implements validation/lifecycle differently;
+- a stable extension model is visible from real examples;
+- shared tooling or migration would reduce total work;
+- the team can own compatibility and documentation.
 
-Apply them to:
+“Used twice” or “before the third time” is only a heuristic. Two similar features may diverge; three duplicated lines may be cheaper than a generic abstraction.
 
-- weapons
-- prompts
-- vehicles
-- jobs
-- crimes/heists
-- shops
-- abilities
-- NPCs
-- quests
-- minigames
+## What belongs together
 
-Used for:
+Group by cohesion and ownership, not by a universal feature/shared split.
 
-- faster feature delivery
-- consistent rules
-- reusable validation
-- shared tooling
-- reduced regressions
+A weapon feature package may reasonably own its configuration, runtime orchestration, and client presentation. A shared combat service may own damage rules used by weapons, NPCs, hazards, and abilities. If a rule is not shared, moving it into a central platform can make the system harder to change.
 
-Practice:
+Ask:
 
-Design a `WeaponPlatform` where a new weapon supplies config, fire mode, hit resolver, recoil model, and optional effects without editing the shared fire service.
+- who owns the authoritative decision?
+- what changes together?
+- which rules are genuinely shared?
+- which extension points are open versus closed?
+- what can be tested independently?
+- what must remain private to the server?
 
-Mastery rule:
+## Contracts and extension points
 
-The platform owns rules. Features supply identity and domain behavior.
+Use the lightest extension mechanism that fits:
 
-## 2. Domain-Specific Languages
+- direct functions for a fixed implementation;
+- a tagged union/conditional for a small closed set;
+- callback tables for simple configurable behavior;
+- strategy objects when behavior owns state/lifecycle;
+- a registry when independently owned extensions are loaded by ID.
 
-A domain-specific language is a constrained way to describe gameplay behavior.
+Registries add admission, duplicate-ID, ordering, versioning, removal, and discoverability responsibilities. They are not automatically superior to code imports.
 
-Apply DSLs through typed configs or declarative tables:
+## Data and configuration
 
-- ability definitions
-- weapon effects
-- quest objectives
-- dialogue nodes
-- shop inventories
-- NPC behaviors
-- prompt actions
+Static configuration is helpful when content designers vary data more often than code. Validate dynamic configuration at load/admission time, but continue runtime validation for player state and hostile input.
 
-Used for:
+Avoid a custom DSL when typed Luau functions/tables are clearer. A DSL becomes a language product: it needs grammar/semantics, errors, tooling, versioning, testing, and security boundaries.
 
-- content authoring
-- safer extension
-- tooling
-- validation
-- generation
-- balancing
+## Domain boundaries
 
-Practice:
+A mature platform may separate:
 
-Create a small ability DSL:
+- content/configuration;
+- authoritative runtime state;
+- rules/behavior;
+- engine adapters;
+- network transport;
+- persistence;
+- presentation;
+- diagnostics.
 
-```lua
-{
-	id = "ConcussiveShot",
-	cost = {ammo = 1},
-	cooldown = 8,
-	effects = {
-		{kind = "Damage", amount = 20},
-		{kind = "Stun", duration = 1.25},
-	},
-}
-```
+These may be modules inside one package rather than independent services. Split only where the boundary improves authority, ownership, change isolation, or verification.
 
-Then validate and execute it through registered effect handlers.
+## Cross-domain transactions
 
-Mastery rule:
+Do not claim that a platform makes multi-system changes automatically atomic. Roblox DataStore `UpdateAsync()` coordinates a single key, while in-memory services can still partially fail. For purchases/rewards, design one authoritative commit record where practical, use idempotency, and define compensation/recovery for external steps.
 
-Good DSLs are constrained enough to validate and expressive enough to reduce custom scripts.
+## Compatibility and deprecation
 
-## 3. Rules Engines
+Compatibility work is proportional to how long old producers/consumers/data can coexist. Consider:
 
-Rules engines compose conditions, costs, effects, cooldowns, targeting, and validation.
+- old live servers and teleport payloads;
+- saved records from older code;
+- queued MemoryStore messages;
+- separately versioned packages;
+- content using removed registry IDs.
 
-Apply them by creating reusable rule pieces:
+A small single-place prototype may not need a general migration framework.
 
-- condition
-- cost
-- target selector
-- validator
-- effect
-- cooldown
-- reward
-- rejection reason
+## Observability
 
-Used for:
+Platform diagnostics should answer domain questions: admitted config count, rejected command reasons, active sessions, queue depth, transaction outcome, network volume, and version. Do not require every platform to ship a dashboard, replay system, fuzz suite, and health server regardless of risk.
 
-- weapons
-- abilities
-- prompts
-- shops
-- quests
-- economy
-- NPC attacks
-- law/crime systems
+Match proof to risk:
 
-Practice:
+- economy/combat/persistence: strong audit and hostile-input testing;
+- cosmetic UI platform: lifecycle and visual checks may dominate;
+- editor-only generator: deterministic output and undo/change-history behavior matter.
 
-Build a rule pipeline for an interaction:
+## Practice project
 
-```text
-validate actor -> validate target -> validate distance -> validate cost -> apply effect -> emit result
-```
+Take three real interaction features. First implement them directly. Extract only the demonstrated common rules into a small interaction package.
 
-Mastery rule:
+Document:
 
-When many systems repeat validate/apply/reward logic, extract the rule model.
+- common rule versus coincidental similarity;
+- closed variants versus open registry entries;
+- server/client boundaries;
+- migration/removal behavior;
+- total code/navigation cost before and after.
 
-## 4. Data Pipelines
+Then add a deliberately unusual fourth feature. If it requires escape hatches everywhere, revise the abstraction instead of forcing it in.
 
-Data pipelines import, validate, version, and deploy gameplay data.
+## Completion evidence
 
-Apply them to:
+You understand this stage when you can:
 
-- weapon configs
-- vehicle configs
-- item databases
-- economy prices
-- mission definitions
-- NPC archetypes
-- prompt maps
-- animation/sound references
+- justify extraction from real variation rather than a slogan;
+- keep feature-specific rules cohesive;
+- select conditionals, callbacks, objects, or registries intentionally;
+- describe failure/compatibility limits honestly;
+- avoid calling an application workflow a database transaction;
+- delete or simplify a platform whose maintenance cost exceeds reuse.
 
-Used for:
+## Primary references
 
-- fewer broken configs
-- automated audits
-- versioned content
-- safe rollout
-- build-time validation
-
-Practice:
-
-Create a config audit command that checks every weapon for valid id, damage range, fire mode, ammo type, animations, sounds, and server validator registration.
-
-Mastery rule:
-
-Content data should fail before runtime when possible.
-
-## 5. Persistence Architecture
-
-Persistence architecture controls save/load, profile ownership, migrations, and write budgets.
-
-Apply it with:
-
-- profile sessions
-- data schemas
-- migrations
-- write queues
-- idempotent transactions
-- conflict handling
-- audit logs
-- rollback-safe records
-
-Used for:
-
-- inventory
-- economy
-- progression
-- weapon ownership
-- attachments
-- vehicles
-- jobs
-- achievements
-
-Practice:
-
-Design an inventory persistence schema with versioned migrations and idempotent purchase records.
-
-Mastery rule:
-
-Persistent data is server-owned financial-grade state. Treat it like a ledger, not a table dump.
-
-## 6. Economy Integrity
-
-Economy integrity prevents duplication, fraud, partial writes, and inconsistent rewards.
-
-Apply transaction principles:
-
-- validate
-- reserve
-- debit
-- mutate
-- credit
-- emit audit event
-- commit
-- recover safely
-
-Used for:
-
-- shops
-- purchases
-- rewards
-- trading
-- jobs
-- robbery payouts
-- weapon unlocks
-- vehicle ownership
-
-Practice:
-
-Create a `PurchaseTransaction` result that is idempotent by transaction id and cannot grant the same weapon twice.
-
-Mastery rule:
-
-Currency and items must change through transactions, not loose mutation.
-
-## 7. Match and Session Orchestration
-
-Match/session orchestration owns lifecycle across players, servers, objectives, and cleanup.
-
-Apply it with:
-
-- lobby/session creation
-- participant admission
-- server reservation
-- reconnect handling
-- objective lifecycle
-- timeout
-- completion
-- cancellation
-- cleanup
-
-Used for:
-
-- heists
-- minigames
-- combat rounds
-- races
-- jobs
-- raids
-- arenas
-
-Practice:
-
-Design a `CombatRoundSession` with explicit states: `Waiting`, `Starting`, `Active`, `Ending`, `Completed`, `Cancelled`, `Destroyed`.
-
-Mastery rule:
-
-Sessions are state machines with authority, not folders full of scripts.
-
-## 8. AI Behavior Architecture
-
-AI architecture controls perception, decision, action, memory, and coordination.
-
-Apply patterns:
-
-- behavior trees
-- utility AI
-- finite state machines
-- planners
-- blackboards
-- perception systems
-- squad coordination
-
-Used for:
-
-- NPC enemies
-- police/criminal AI
-- bosses
-- civilians
-- vehicles
-- vendors
-- guards
-- mission actors
-
-Practice:
-
-Build an NPC combat agent with perception, target memory, utility scoring, and action execution through the same weapon/action contracts as players.
-
-Mastery rule:
-
-AI should use the same authoritative game contracts as players where possible.
-
-## 9. Plugin-Grade Extensibility
-
-Plugin-grade extensibility means other features can extend the platform safely.
-
-Apply with:
-
-- registries
-- capability APIs
-- sandboxed extension surfaces
-- typed contracts
-- versioned interfaces
-- compatibility tests
-- deprecation policy
-
-Used for:
-
-- weapon modules
-- attachment effects
-- prompt actions
-- quest objectives
-- minigames
-- vehicle strategies
-- AI behaviors
-
-Practice:
-
-Create an `EffectRegistry` that admits only effects satisfying a typed contract and runtime validator.
-
-Mastery rule:
-
-Extension points must be easier to use correctly than incorrectly.
-
-## 10. Cross-Project Policy Extraction
-
-Cross-project policy extraction turns proven patterns into templates and instructions.
-
-Apply it by extracting:
-
-- agent policies
-- templates
-- checklists
-- config schemas
-- starter modules
-- test harnesses
-- audit commands
-- debug tools
-
-Used for:
-
-- RK Robanger
-- v2 Revamp Guns
-- future gunkits
-- vehicle projects
-- prompt systems
-- economy systems
-- combat frameworks
-
-Practice:
-
-After building a feature twice, extract the shared policy, typed contract, skeleton modules, and validation checklist into a reusable template.
-
-Mastery rule:
-
-A pattern is not mastered until it can be reused without copying mistakes.
-
-## Compatibility With ECS
-
-Large-scale platforms use ECS as the shared state substrate where systems need queryable runtime state.
-
-Policy:
-
-> Domain platforms should declare which state is ECS data, which state is config, which state is persistence, and which state is presentation.
-
-## Compatibility With OOP
-
-OOP owns platform services, adapters, controllers, registries, and lifecycle.
-
-Policy:
-
-> Domain platforms expose narrow service APIs and polymorphic extension contracts.
-
-## Compatibility With Scheduling
-
-Large systems need explicit execution and lifecycle phases.
-
-Policy:
-
-> Platform orchestration must name when validation, simulation, mutation, replication, persistence, cleanup, and diagnostics run.
-
-## Compatibility With Runtime Contracts
-
-Platforms admit third-party or feature-authored behavior through contracts.
-
-Policy:
-
-> Every extension point must validate its registered config, behavior object, permissions, and lifecycle.
-
-## Compatibility With Typed Luau
-
-Typed Luau makes platform boundaries visible.
-
-Policy:
-
-> Every platform needs public service types, config types, result types, state unions, and extension contract types.
-
-## Compatibility With Networking
-
-Domain platforms need protocol surfaces.
-
-Policy:
-
-> Every platform that crosses client/server boundaries owns a message catalog, rate policy, authority policy, and migration strategy.
-
-## Compatibility With Rollback and Temporal Architecture
-
-Replay-sensitive platforms need command/event/snapshot design.
-
-Policy:
-
-> If platform outcomes must be replayed, audited, or corrected, they need typed commands, events, snapshots, ticks, and history buffers.
-
-## Compatibility With Anti-Cheat
-
-Combat platforms must design against hostile clients from the start.
-
-Policy:
-
-> Anti-cheat is not a bolt-on module. It is a platform requirement for combat authority, visibility, networking, and evidence.
-
-## Compatibility With Observability
-
-Large platforms must prove what they are doing.
-
-Policy:
-
-> Every platform needs diagnostics, health reports, audit logs, fuzz tests, and failure-injection paths proportional to risk.
-
-## For Gunkits
-
-A mature gunkit platform includes:
-
-```text
-WeaponConfig
-WeaponState
-FireModeRegistry
-ReloadPolicyRegistry
-HitResolverRegistry
-EffectPipeline
-DamageTransactionService
-CombatValidationService
-LagCompensationService
-AntiCheatEvidenceService
-NetworkSchemaRegistry
-ReplayCaptureService
-WeaponConfigAuditor
-```
-
-Policy:
-
-New weapons should be config plus registered behavior. Shared services own authority, validation, networking, damage, audit, and observability.
-
-## For Prompt Systems
-
-A mature prompt platform includes:
-
-```text
-PromptConfig
-PromptState
-PromptActionRegistry
-PermissionRegistry
-InteractionSessionService
-RewardTransactionService
-PromptAdapter
-PromptReplicationService
-PromptAuditLog
-```
-
-Policy:
-
-New interactions should be registered actions and permissions, not new one-off scripts.
-
-## For Vehicles
-
-A mature vehicle platform includes:
-
-```text
-VehicleConfig
-VehicleState
-InputCommandSchema
-SuspensionStrategyRegistry
-AuthorityHandoffService
-VehicleCorrectionService
-PhysicsAuthorityPolicy
-VehicleTelemetryService
-VehicleAuditLog
-```
-
-Policy:
-
-New vehicles should be config plus registered strategies. Shared services own authority, correction, telemetry, and cleanup.
-
-## The Indefinite Framework
-
-Your long-term Roblox framework should include:
-
-```text
-DomainPlatform
-RulesEngine
-ConfigPipeline
-SchemaRegistry
-EffectRegistry
-PermissionRegistry
-TransactionService
-PersistenceService
-SessionOrchestrator
-AIBehaviorPlatform
-PluginExtensionHost
-TemplateLibrary
-PolicyExtractor
-```
-
-## How To Master It
-
-Practice in this order:
-
-1. Pick one domain: weapons, prompts, vehicles, economy, jobs, or AI.
-2. Identify shared rules versus feature identity.
-3. Define the platform service API.
-4. Define typed config.
-5. Define extension contracts.
-6. Define runtime validators.
-7. Define transaction boundaries.
-8. Define network schemas.
-9. Define persistence needs.
-10. Define observability and audit logs.
-11. Build two features on the platform.
-12. Remove feature-name conditionals from shared code.
-13. Add tooling to validate configs and registrations.
-14. Add failure injection and contract tests.
-15. Extract the pattern into reusable project policy and templates.
-
-## Permanent Policy
-
-Use this rule for every future Roblox system:
-
-> If you build the same kind of feature twice, stop and extract the platform before building it a third time.
+- [Roblox ModuleScripts](https://create.roblox.com/docs/scripting/module)
+- [Roblox client-server runtime](https://create.roblox.com/docs/projects/client-server)
+- [Roblox data stores](https://create.roblox.com/docs/cloud-services/data-stores)
+- [Roblox memory stores](https://create.roblox.com/docs/cloud-services/memory-stores)
+- [Luau structural types](https://luau.org/types/)

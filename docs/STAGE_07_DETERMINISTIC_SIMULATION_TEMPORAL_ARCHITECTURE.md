@@ -1,529 +1,139 @@
-# Stage 7: Deterministic Simulation and Temporal Architecture
+# Stage 7: Simulation Time, History, and Replay
 
-Deterministic simulation is the discipline of making important game outcomes reproducible from the same starting state and the same inputs. Temporal architecture is the discipline of making time explicit: real time, server time, client time, render time, simulation ticks, cooldown time, replay time, and network time are not the same thing.
+Time-sensitive code needs explicit clocks and state history only to the degree required by the mechanic. “Deterministic” must name the environment, inputs, and tolerance being claimed.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> Important gameplay should not depend on accidental timing. If a system affects authority, rollback, replay, validation, economy, combat, or fairness, its time model must be explicit.
+## Time domains
 
-## 1. Deterministic Math Policy
+Distinguish at least:
 
-Deterministic math means using calculations that produce predictable enough results for the mechanic.
+- render/frame time;
+- simulation step/tick;
+- server-observed wall/network time;
+- client-local time;
+- duration/deadline time;
+- persisted calendar time;
+- test-controlled time.
 
-Apply it by avoiding hidden randomness, uncontrolled physics dependence, unordered iteration, and frame-dependent accumulation in replay-sensitive systems.
+Do not compare timestamps from different clocks without a documented mapping. Do not use a client clock as authoritative proof of when an action occurred.
 
-Used for:
+Injecting a clock is useful when timing behavior needs repeatable tests. Stable leaf code that simply needs current time may call the platform directly; not every function needs a clock interface.
 
-- rollback
-- projectiles
-- melee hitboxes
-- combat validation
-- cooldowns
-- procedural encounters
-- replay tests
-- economy transactions
+## Fixed timestep
 
-Practice:
+A fixed timestep helps with stable application update intervals, bounded history indices, and replayable pure-data logic. It does not guarantee:
 
-Build a small projectile simulation that receives position, velocity, and fixed `dt`. Run it twice with the same input and verify the final state is identical.
+- identical floating-point results on every environment;
+- deterministic Roblox physics;
+- identical event ordering;
+- enough CPU to process every missed step.
 
-Mastery rule:
+Specify overload behavior: cap catch-up, slow simulation, drop time, degrade features, or reject the workload. Each has gameplay consequences.
 
-If you need to replay it, the same input must produce the same result.
+## Levels of repeatability
 
-## 2. Seeded Random Streams
+Avoid one vague “deterministic” label. State the actual target:
 
-Seeded random streams make random outcomes reproducible.
+1. repeatable within one test runtime;
+2. repeatable client/server for a supported engine build;
+3. repeatable across devices;
+4. repeatable across engine versions or saved replays.
 
-Apply it by giving each domain its own random stream:
+The stronger claims require stronger evidence. Engine physics and undocumented random implementation details should not be assumed stable across versions.
 
-- combat spread
-- loot rolls
-- NPC decisions
-- procedural placement
-- minigame generation
-- cosmetic variance
+## Randomness
 
-Used for:
+Use explicit random streams when outcome reproduction matters. Separate domains only when cross-domain consumption would otherwise change meaningful results.
 
-- rollback
-- audit logs
-- replay
-- fairness checks
-- procedural generation
-- anti-cheat review
+Record seeds and, when necessary, decisions/outputs. A seed alone may be insufficient for long-lived replay compatibility if the algorithm or call order changes.
 
-Practice:
+Never use predictable gameplay RNG for security tokens, purchase identity, or secrets.
 
-Create a combat RNG stream and a loot RNG stream. Prove that changing loot rolls does not change combat spread.
+## State machines and time
 
-Mastery rule:
-
-Randomness should be isolated by domain. One system's random calls should not change another system's outcomes.
-
-## 3. Fixed-Point and Quantized Approximations
-
-Sometimes stable approximations are better than uncontrolled precision.
-
-Apply it by quantizing positions, angles, velocities, recoil, spread, and input values where exact floating-point precision is unnecessary.
-
-Used for:
-
-- buffer networking
-- rollback
-- hit validation
-- vehicle telemetry
-- combat input
-- replay compression
-
-Practice:
-
-Quantize an aim yaw angle into `0-65535`, send it through a typed record, decode it, and measure the maximum angular error.
-
-Mastery rule:
-
-Precision is a budget. Spend only what the mechanic needs.
-
-## 4. Simulation Clocks
-
-Different clocks serve different jobs.
-
-Apply separate clocks for:
-
-- server wall time
-- simulation tick time
-- client render time
-- cooldown time
-- network timestamp time
-- replay time
-- test fake time
-
-Used for:
-
-- cooldowns
-- prediction
-- rollback
-- replay
-- networking
-- UI timers
-- minigames
-- vehicle simulation
-
-Practice:
-
-Create a `Clock` contract with real and fake implementations. Use fake time to test cooldowns without waiting.
-
-Mastery rule:
-
-Never let important gameplay logic depend on an unnamed clock.
-
-## 5. Temporal State Machines
-
-Temporal state machines model states that change over time.
-
-Apply them with discriminated unions:
+Represent meaningful temporal states directly instead of scattering booleans and loose waits:
 
 ```lua
-export type ReloadState =
-	{kind: "Idle"}
-	| {kind: "Reloading", startedTick: number, endsTick: number}
-	| {kind: "Cancelled", reason: string}
+type ChargeState =
+	{ kind: "Idle" }
+	| { kind: "Charging", startedTick: number }
+	| { kind: "Released", releasedTick: number }
 ```
 
-Used for:
+Use ticks for simulation-relative ordering and an appropriate clock for real deadlines. Pausing a state machine needs explicit rules for whether deadlines shift or continue.
 
-- reloads
-- prompts
-- minigames
-- vehicle occupancy
-- match flow
-- ability casts
-- cooldowns
-- status effects
+## Events, audit logs, and event sourcing
 
-Practice:
+An audit log records facts for explanation. Event sourcing reconstructs state from an authoritative event sequence. These are not synonyms.
 
-Replace a reload `task.wait` flow with a tick-based `ReloadState` processed by a system.
+Event sourcing adds ordering, schema evolution, replay, idempotency, storage, and correction complexity. Use it only when reconstructing state from events is an actual system requirement. Many games need periodic snapshots plus a bounded audit log instead.
 
-Mastery rule:
+## Snapshots and deltas
 
-If time changes the legal state, model the state explicitly.
+For each snapshot stream define:
 
-## 6. Event Sourcing
+- schema/version;
+- base frame;
+- full-state interval;
+- delta application order;
+- retention and eviction;
+- checksum meaning;
+- recovery from missing/corrupt history.
 
-Event sourcing records what happened as commands or domain events.
+A checksum mismatch detects disagreement; it does not identify which side is correct or what caused it.
 
-Apply it by recording authoritative events:
+## Side effects during replay
 
-- weapon fired
-- damage applied
-- item purchased
-- prompt completed
-- vehicle entered
-- match started
-- reward granted
+Replay must not duplicate external side effects. Separate pure state transition from:
 
-Used for:
+- RemoteEvents;
+- purchases/rewards;
+- DataStore writes;
+- analytics;
+- sounds/effects/UI;
+- Instance creation that is not part of the restored state.
 
-- audit logs
-- replay
-- rollback
-- economy integrity
-- debugging
-- desync investigation
+Commit or emit those effects once, after the authoritative outcome is known, using idempotency where necessary.
 
-Practice:
+## Physics boundary
 
-For a purchase transaction, record `PurchaseRequested`, `PurchaseValidated`, `CurrencyDebited`, `ItemGranted`, and `PurchaseCompleted`.
+For each mechanic decide whether Roblox physics is:
 
-Mastery rule:
+- authoritative engine state accepted with server validation;
+- predicted and corrected through the current server-authority model;
+- an approximation driven by simpler authoritative data;
+- presentation only.
 
-For important outcomes, the system should be able to explain the path, not just the final value.
+Do not promise deterministic replay of arbitrary assemblies, Humanoids, contacts, or network-owned physics without direct platform evidence and tests.
 
-## 7. Snapshot Delta Encoding
+## Practice project
 
-Snapshot delta encoding stores only meaningful changes between states.
+Create a pure-data cooldown/projectile simulation with:
 
-Apply it by comparing current and previous snapshots and recording changed components or fields.
+- a fake clock and fixed step;
+- recorded inputs;
+- seeded randomness;
+- full and delta snapshots;
+- a replay hash;
+- a side-effect collector that emits only after replay.
 
-Used for:
+Run the same fixture repeatedly and then deliberately introduce unordered table iteration or an unrecorded random call to show how the claim fails.
 
-- replication
-- rollback history
-- replay storage
-- desync debugging
-- bandwidth reduction
-- save diffing
+## Completion evidence
 
-Practice:
+You understand this stage when you can:
 
-Create snapshots for 100 entities with Health and Position. Store only entities whose components changed since the previous tick.
+- name the clock and units for every timestamp;
+- state the exact repeatability level proven;
+- separate audit logging from event sourcing;
+- prevent side-effect duplication during replay;
+- recover from missing delta bases;
+- identify which engine behavior remains outside the deterministic boundary.
 
-Mastery rule:
+## Primary references
 
-Full snapshots are for recovery. Deltas are for regular flow.
-
-## 8. Deterministic Physics Boundaries
-
-Roblox physics is powerful, but not always deterministic enough for replay-sensitive authority.
-
-Apply a boundary decision:
-
-- physics as authority
-- physics as approximation
-- physics as presentation
-- simplified simulation as authority
-
-Used for:
-
-- vehicles
-- projectiles
-- ragdolls
-- thrown objects
-- collisions
-- suspension
-- sports mechanics
-
-Practice:
-
-For one projectile type, compare Roblox physics movement against a simple server-authored kinematic simulation. Decide which one owns authority and which one presents.
-
-Mastery rule:
-
-Do not assume engine physics is rollback-safe. Assign its authority role explicitly.
-
-## 9. Replay Tooling
-
-Replay tooling lets you reproduce bugs from inputs and state.
-
-Apply it by capturing:
-
-- starting snapshot
-- input commands
-- authoritative events
-- random seeds
-- tick range
-- config version
-- rejection reasons
-
-Used for:
-
-- combat bugs
-- anti-cheat review
-- rollback debugging
-- vehicle desync
-- economy audits
-- minigame fairness
-
-Practice:
-
-Record a 10-second combat replay with commands, snapshots, and RNG seed. Re-run it in a test harness and verify the same final state.
-
-Mastery rule:
-
-If you cannot reproduce a bug, you do not fully own the system.
-
-## 10. Time-Travel Debugging
-
-Time-travel debugging lets you inspect historical state and transitions.
-
-Apply it with bounded history buffers and debug views:
-
-- entity state by tick
-- component diffs
-- event log
-- command log
-- network messages
-- validation results
-- RNG outputs
-
-Used for:
-
-- desyncs
-- suspicious shots
-- state corruption
-- failed transactions
-- cooldown bugs
-- rollback corrections
-
-Practice:
-
-Build a debug dump for one entity showing its last 30 ticks of Health, Position, active states, and events.
-
-Mastery rule:
-
-The system should explain not only what is true now, but how it became true.
-
-## Compatibility With ECS
-
-ECS is the ideal shape for deterministic simulation.
-
-ECS provides:
-
-```text
-Plain component state
-Stable entity ids
-System phases
-Mutation pipelines
-Snapshots
-Queries
-```
-
-Temporal architecture provides:
-
-```text
-Ticks
-State history
-Events
-Replay
-Clock boundaries
-Delta snapshots
-```
-
-Policy:
-
-> ECS defines the state. Temporal architecture defines its history.
-
-## Compatibility With OOP
-
-OOP owns the tools and services around deterministic systems.
-
-Use OOP for:
-
-- `ClockService`
-- `ReplayService`
-- `SnapshotStore`
-- `EventLog`
-- `RandomStream`
-- `TimeTravelDebugger`
-- `PhysicsAuthorityAdapter`
-
-Policy:
-
-> OOP owns temporal machinery. ECS owns temporal data.
-
-## Compatibility With Scheduling
-
-Scheduling is the execution form of temporal architecture.
-
-Use scheduling for:
-
-- fixed tick loops
-- event ordering
-- snapshot timing
-- replay stepping
-- network flush timing
-- cleanup windows
-
-Policy:
-
-> Temporal architecture without scheduler discipline is just timestamps.
-
-## Compatibility With Runtime Contracts
-
-Runtime contracts protect temporal boundaries.
-
-Validate:
-
-- tick ids
-- event shapes
-- command order
-- replay admission
-- snapshot shape
-- random stream identity
-- historical window bounds
-
-Policy:
-
-> A replayed event must be at least as valid as a live event.
-
-## Compatibility With Typed Luau
-
-Typed Luau makes time explicit.
-
-Use types for:
-
-- `Tick`
-- `FrameId`
-- `Command`
-- `DomainEvent`
-- `Snapshot`
-- `SnapshotDelta`
-- `ReplayRecord`
-- `RandomStreamId`
-- `Clock`
-
-Policy:
-
-> If time matters, type the time value.
-
-## Compatibility With Rollback
-
-Rollback depends directly on deterministic temporal design.
-
-Use:
-
-- fixed ticks
-- command history
-- snapshots
-- replay runner
-- deterministic RNG
-- presentation separation
-- debug frame history
-
-Policy:
-
-> Rollback is temporal architecture under latency pressure.
-
-## For Gunkits
-
-Apply deterministic temporal design to:
-
-- fire cadence
-- reload timing
-- burst timing
-- recoil recovery
-- spread recovery
-- projectile simulation
-- hitscan lag compensation
-- damage events
-- anti-cheat audit logs
-- replayable shot decisions
-
-Strong design:
-
-```text
-FireCommand at tick N
-Server validates weapon state at tick N
-Lag compensation reads historical hitbox state
-DamageTransaction emits domain event
-Replay log records command, result, and rejection reason
-```
-
-## For Prompt Systems
-
-Apply to:
-
-- hold duration
-- cooldowns
-- session timeout
-- minigame timer
-- reward transaction
-- cancellation
-- player leaving
-- streamed object removal
-
-Policy:
-
-Prompt outcomes should be modeled as timed server transactions, not loose waits.
-
-## For Vehicles
-
-Apply to:
-
-- input sampling
-- fixed-step vehicle state
-- suspension telemetry
-- authority handoff
-- correction windows
-- replayable collision decisions
-- physics boundary choices
-
-Policy:
-
-Vehicle systems must explicitly decide which state is physics-authored, server-authored, predicted, or presentation-only.
-
-## The Indefinite Framework
-
-Your long-term Roblox framework should include:
-
-```text
-Clock
-FakeClock
-Tick
-FixedStepLoop
-RandomStream
-DomainEventLog
-SnapshotStore
-SnapshotDelta
-ReplayRunner
-HistoryBuffer
-TimeTravelDebugger
-PhysicsAuthorityPolicy
-```
-
-## How To Master It
-
-Practice in this order:
-
-1. Build a fixed-step simulation.
-2. Add typed ticks.
-3. Add a fake clock.
-4. Add seeded random streams.
-5. Add temporal state machines.
-6. Add event logs.
-7. Add snapshots.
-8. Add snapshot deltas.
-9. Add replay from command history.
-10. Add time-travel debug dumps.
-11. Add deterministic projectile tests.
-12. Add lag-compensated shot replay.
-13. Add physics authority decisions.
-14. Add vehicle/prompt/gun temporal reviews.
-15. Convert one real feature from waits to explicit tick/state logic.
-
-## Permanent Policy
-
-Use this rule for every future Roblox system:
-
-> If a bug, exploit, rollback, transaction, or replay depends on when something happened, the system must store time explicitly and make that time inspectable.
-
-The true mastery is combining temporal architecture with the earlier stages:
-
-- ECS stores replayable state.
-- OOP owns temporal services.
-- Scheduling runs fixed phases.
-- Runtime contracts validate commands and events.
-- Typed Luau names time and state.
-- Rollback replays history.
-- Anti-cheat compares actual events against possible histories.
+- [Roblox RunService API](https://create.roblox.com/docs/reference/engine/classes/RunService)
+- [Roblox server-authority model](https://create.roblox.com/docs/projects/server-authority)
+- [Luau standard library](https://luau.org/library/)
+- [Luau performance](https://luau.org/performance/)

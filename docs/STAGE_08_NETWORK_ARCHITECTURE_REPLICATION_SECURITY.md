@@ -1,562 +1,130 @@
-# Stage 8: Network Architecture, Replication, and Security
+# Stage 8: Networking, Replication, and Security
 
-Roblox networking mastery is not knowing how to fire a RemoteEvent. It is designing a typed protocol where authority, validation, replication, bandwidth, reliability, compatibility, observability, and abuse resistance are all explicit.
+Roblox already replicates the DataModel, physics, and supported properties. Custom remotes supplement that system; they are not automatically the primary representation of all state.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> The network is a protocol, not a shortcut between scripts. Every message needs direction, schema, authority, validation, rate policy, reliability expectation, observability, and a migration path when it evolves.
+## Start with the engine model
 
-## 1. Trust Boundaries
+Before adding a custom message, ask:
 
-Trust boundaries define which side may originate, validate, mutate, and observe data.
+- does Roblox already replicate the Instance/property?
+- can the receiver derive the value locally?
+- is an Attribute or Value object appropriate for low-rate replicated state?
+- does streaming affect whether the Instance exists on this client?
+- is this intent, authoritative state, or presentation-only effect?
 
-Apply it by classifying every field:
+Custom replication is justified when engine replication is too broad, lacks the application schema, needs owner-only data, requires different rate/reliability semantics, or a measured hot path benefits from packing.
 
-- client intent
-- server-authoritative state
-- client presentation state
-- owner-only state
-- team-visible state
-- public replicated state
-- server-only state
+## Remote semantics
 
-Used for:
+- `RemoteEvent` is asynchronous, one-way, and does not yield the sender for a reply.
+- `RemoteFunction` is synchronous request/response and yields the invoker.
+- `UnreliableRemoteEvent` is asynchronous, unordered, and unreliable; messages may be dropped.
 
-- guns
-- vehicles
-- prompts
-- inventory
-- economy
-- missions
-- NPCs
-- match state
+RemoteFunctions are not forbidden for gameplay or by frequency alone. They are appropriate when a bounded request truly needs an immediate response and the caller can tolerate yielding/failure. Avoid server-to-client `InvokeClient()` in critical paths because the client can error, disconnect, or never return.
 
-Practice:
+UnreliableRemoteEvents currently drop payloads over 1,000 bytes and are suitable only when loss/reordering is acceptable. Recheck current limits before shipping.
 
-Audit one RemoteEvent. Mark every payload field as trusted, untrusted, derived, server-owned, or presentation-only.
+## Message contracts
 
-Mastery rule:
+For each custom message document what is relevant:
 
-If a field crosses from client to server, it is hostile until validated.
+- direction and sender identity;
+- payload type and runtime validator;
+- semantic authority;
+- size/range/depth limits;
+- rate/burst policy;
+- ordering/duplicate policy;
+- reliability choice;
+- recipients/relevance;
+- version/migration behavior;
+- diagnostics and privacy.
 
-## 2. Remote Protocol Design
+Not every message needs a complex version header. A small experience deployed atomically may only need a simple schema revision and safe rejection. Persistent queues, teleports, old servers, and long-lived data increase compatibility needs.
 
-Remote protocol design means messages are named contracts, not ad-hoc tables.
+## Server validation
 
-Apply it with a message catalog:
+The server-injected `Player` argument identifies which client fired a server remote. It does not make the remaining arguments trustworthy.
 
-```text
-FireRequested
-ReloadRequested
-InteractionRequested
-EntityDelta
-CorrectionApplied
-InventoryDelta
-```
+Validate in bounded layers:
 
-Each message defines direction, type, validator, version, rate limit, and handler.
+1. type/shape/size, including NaN and infinity;
+2. rate and amplification cost;
+3. session/sequence freshness where relevant;
+4. permission, ownership, team, and current state;
+5. distance/line of sight/target validity where relevant;
+6. resource/cooldown/economy rules;
+7. authoritative commit.
 
-Used for:
+Reject before expensive pathfinding, raycasts, cloning, or cloud calls where possible.
 
-- secure feature APIs
-- refactors
-- debug logs
-- migrations
-- generated wrappers
+## Network ownership
 
-Practice:
+Client network ownership gives the client substantial control over simulation of the owned unanchored assembly. Treat positions, velocities, touches, and movement consequences as untrusted for competitive/gameplay-critical outcomes. Validation must be mechanic-specific; a universal speed check produces false positives in vehicles, teleports, and unstable networks.
 
-Create a `NetworkSchemas` module with five messages and reject any send/receive that is not registered.
+Roblox’s current server-authority model changes some physics/prediction options. Treat it as an explicit engine mode with documented setup and tests.
 
-Mastery rule:
+## Buffers and quantization
 
-No anonymous network messages.
+A `buffer` is a fixed-size mutable byte block with zero-based offsets and bounded read/write operations. Buffers are useful when measurement shows that binary packing, batching, or allocation reduction matters.
 
-## 3. Replication Layers
+Every codec needs:
 
-Replication has layers:
+- version/layout documentation;
+- length checks before reads;
+- integer/range/NaN handling;
+- quantization error bounds;
+- maximum record count;
+- decode failure behavior;
+- round-trip and malformed-input tests.
 
-- Roblox engine replication
-- custom authoritative replication
-- client prediction state
-- presentation-only effects
-- debug/telemetry replication
+Binary is not automatically smaller. Roblox encodes/compresses certain remote values, including buffers, and payload shape affects the result. Compare representative messages in the real transport.
 
-Apply it by deciding which layer owns each data type.
+## Delta replication
 
-Used for:
+Deltas require a known base. Without acknowledgement or a recoverable full snapshot, loss/reordering/version mismatch can make a small delta useless.
 
-- characters
-- vehicles
-- projectiles
-- UI
-- prompts
-- markers
-- hit effects
-- state deltas
+Full snapshots can be cheaper for small or heavily changing records. Choose by measured encoded size, CPU, frequency, recipient count, and recovery complexity.
 
-Practice:
+## Interest and privacy
 
-For a weapon, split muzzle flash, ammo, damage, recoil, tracer, hitmarker, and kill confirmation into replication layers.
+Send only recipients who need application-level information, but do not claim perfect secrecy for objects/data already replicated to a client. Streaming and server-selected remotes can reduce exposure; replicated LocalScripts and ModuleScripts should be assumed inspectable.
 
-Mastery rule:
+## Attributes
 
-Do not custom-replicate what Roblox already handles well. Do not rely on Roblox replication for state that needs server validation or protocol control.
+Attributes can be appropriate for small Instance-associated replicated values. The writer and authority still matter. The current server-authority prediction model explicitly uses attributes for synchronized custom simulation state on predicted Instances within documented limits, so blanket bans on authoritative health/ammo attributes are outdated in that mode.
 
-## 4. Interest Management
+Outside that mode, avoid using hundreds of high-frequency attributes as an unmeasured custom replication database. Compare against Instances, remotes, and local data stores for the actual use case.
 
-Interest management sends only relevant state to each client.
+## Practice project
 
-Apply it by filtering replication by:
+Implement one interaction request three ways where applicable:
 
-- distance
-- team
-- line of sight
-- ownership
-- streaming area
-- match/session
-- permission
-- gameplay visibility
+1. RemoteEvent intent plus result event;
+2. client-to-server RemoteFunction;
+3. no custom remote because engine replication/Attribute is sufficient.
 
-Used for:
+Add hostile payload, spam, disconnect, missing Instance, streaming, and oversized data tests. Measure recipient count × frequency × encoded payload plus validation/serialization CPU.
 
-- ESP reduction
-- bandwidth savings
-- large maps
-- NPCs
-- markers
-- interactables
-- vehicles
+## Completion evidence
 
-Practice:
+You understand this stage when you can:
 
-Build a marker replication rule that sends objective markers only to players whose team, distance, and mission state allow them to see it.
+- state actual RemoteEvent/RemoteFunction/UnreliableRemoteEvent semantics;
+- justify engine versus custom replication;
+- trace each client request through semantic validation and commit;
+- explain network-ownership risk without a universal movement formula;
+- prove buffer/delta value with transport measurements;
+- identify what information is already visible to a client.
 
-Mastery rule:
+## Primary references
 
-A client should not receive combat-relevant information just because it exists on the server.
-
-## 5. Bandwidth Budgeting
-
-Bandwidth budgeting means knowing how much each feature sends.
-
-Apply per-feature budgets:
-
-- bytes per second
-- messages per second
-- max payload size
-- burst allowance
-- per-player budget
-- server aggregate budget
-
-Used for:
-
-- guns
-- vehicles
-- projectiles
-- entity deltas
-- minimaps
-- NPC updates
-- combat telemetry
-
-Practice:
-
-Add logging for message name, payload size estimate, direction, player, and send rate. Create a report for the top 10 network users.
-
-Mastery rule:
-
-Networking decisions without measurement are guesses.
-
-## 6. Authority Handoff
-
-Authority handoff controls when ownership changes.
-
-Apply it for:
-
-- vehicle seats
-- physics network ownership
-- mounted weapons
-- temporary projectiles
-- carried objects
-- minigame sessions
-- party/match ownership
-
-Used for:
-
-- vehicles
-- physics tools
-- sports mechanics
-- interactions
-- server reservations
-
-Practice:
-
-Design a vehicle authority handoff record with occupant id, vehicle id, start tick, end tick, reason, and cleanup path.
-
-Mastery rule:
-
-Ownership transfer must be explicit, revocable, and auditable.
-
-## 7. Secure Command Validation
-
-Command validation proves an action is legal before mutation.
-
-Validate:
-
-- player identity
-- entity existence
-- ownership
-- permission
-- distance
-- cooldown
-- resource cost
-- state transition
-- target eligibility
-- sequence
-- rate
-
-Used for:
-
-- firing
-- reloading
-- interaction
-- purchases
-- arrests/tasers
-- trading
-- vehicle entry
-- rewards
-
-Practice:
-
-Create a validation pipeline that returns typed rejection reasons before any mutation occurs.
-
-Mastery rule:
-
-Validation comes before mutation. Always.
-
-## 8. Abuse-Resistant Cooldowns
-
-Cooldowns are security boundaries, not just UX.
-
-Apply server-side timing for:
-
-- fire rate
-- reload
-- prompt use
-- purchases
-- ability activation
-- vehicle entry/exit
-- reward claiming
-- RemoteEvent rate
-
-Used for:
-
-- exploit resistance
-- fairness
-- server load control
-- economy integrity
-
-Practice:
-
-Implement cooldowns with server time or simulation ticks. Prove client clock changes cannot bypass them.
-
-Mastery rule:
-
-Client cooldowns communicate readiness. Server cooldowns enforce readiness.
-
-## 9. Desync Detection
-
-Desync detection finds divergence between server truth and client mirrors.
-
-Apply it with:
-
-- sequence numbers
-- state hashes
-- component checksums
-- correction counts
-- rejected prediction reports
-- replay records
-- snapshot comparison
-
-Used for:
-
-- rollback
-- prediction
-- vehicles
-- weapons
-- inventory
-- client mirrors
-
-Practice:
-
-Send a compact server state checksum every second for a predicted system. Log when the client mirror disagrees.
-
-Mastery rule:
-
-If clients mirror state, build a way to prove when the mirror is wrong.
-
-## 10. Protocol Migration
-
-Protocols evolve while players may be on different versions.
-
-Apply:
-
-- message version fields
-- optional fields
-- feature flags
-- deprecation windows
-- compatibility validators
-- staged rollout
-- old-client rejection paths
-
-Used for:
-
-- live updates
-- gunkit changes
-- vehicle rewrites
-- prompt framework upgrades
-- economy migrations
-- buffer layout changes
-
-Practice:
-
-Add a version byte to one buffer message and support version 1 and version 2 decode paths.
-
-Mastery rule:
-
-If a protocol can change, it needs a compatibility story before production.
-
-## Compatibility With ECS
-
-Networking should replicate ECS state deliberately.
-
-Use ECS for:
-
-- authoritative server state
-- client mirror state
-- component deltas
-- snapshots
-- correction records
-- interest queries
-
-Policy:
-
-> Replicate selected ECS state through typed protocol messages, not by leaking the whole world.
-
-## Compatibility With OOP
-
-OOP owns network services and adapters.
-
-Use:
-
-- `NetworkService`
-- `RemoteAdapter`
-- `SchemaRegistry`
-- `ReplicationService`
-- `InterestService`
-- `RateLimiter`
-- `ProtocolLogger`
-
-Policy:
-
-> Feature code should call typed network APIs, not raw RemoteEvents.
-
-## Compatibility With Scheduling
-
-Networking depends on timing.
-
-Use scheduling for:
-
-- input collection
-- validation
-- simulation commit
-- replication flush
-- rate windows
-- retry windows
-- correction timing
-
-Policy:
-
-> Network messages should be admitted and flushed in declared phases.
-
-## Compatibility With Runtime Contracts
-
-Runtime contracts admit network data.
-
-Use validators for:
-
-- RemoteEvent payloads
-- buffer decode records
-- sequence numbers
-- entity ids
-- permission
-- payload length
-- numeric ranges
-- message versions
-
-Policy:
-
-> No network payload enters gameplay until it passes runtime admission.
-
-## Compatibility With Typed Luau
-
-Typed Luau defines the protocol.
-
-Use types for:
-
-- message payloads
-- rejection reasons
-- replication deltas
-- correction records
-- buffer layouts
-- rate policies
-- protocol versions
-
-Policy:
-
-> Every network schema has a static type and a runtime validator.
-
-## Compatibility With Rollback and Temporal Architecture
-
-Rollback uses networking as its command stream.
-
-Use:
-
-- sequence numbers
-- ticks
-- input buffers
-- snapshots
-- corrections
-- replay records
-- bounded history windows
-
-Policy:
-
-> Network time must map cleanly to simulation time.
-
-## Compatibility With Anti-Cheat
-
-Network security is the first anti-cheat layer.
-
-Use:
-
-- information minimization
-- command validation
-- rate limits
-- target eligibility
-- visibility filters
-- marker filtering
-- audit logs
-- possibility reports
-
-Policy:
-
-> Anti-cheat starts by refusing to receive or reveal unnecessary information.
-
-## For Gunkits
-
-Required network design:
-
-```text
-Client -> Server:
-  FireRequested
-  ReloadRequested
-  EquipRequested
-  AimInputBatch
-
-Server -> Client:
-  FireAccepted
-  FireRejected
-  AmmoDelta
-  HitConfirmed
-  Correction
-  ReplicatedCombatEvent
-```
-
-Policy:
-
-Client messages are intent. Server messages are admitted truth or presentation permission.
-
-## For Prompt Systems
-
-Required network design:
-
-```text
-Client -> Server:
-  InteractionRequested
-  InteractionCancelled
-
-Server -> Client:
-  InteractionAccepted
-  InteractionRejected
-  PromptStateDelta
-  RewardConfirmed
-```
-
-Policy:
-
-Prompt rewards and completion are server transactions.
-
-## For Vehicles
-
-Required network design:
-
-```text
-Client -> Server:
-  VehicleInputCommand
-  SeatRequest
-
-Server -> Client:
-  VehicleStateDelta
-  AuthorityGranted
-  AuthorityRevoked
-  Correction
-```
-
-Policy:
-
-Vehicle input may be client-authored. Vehicle authority and combat/collision outcomes remain server-controlled.
-
-## The Indefinite Framework
-
-Your long-term Roblox framework should include:
-
-```text
-NetworkSchemaRegistry
-RemoteAdapter
-NetworkChannel
-RateLimiter
-InterestService
-ReplicationService
-DeltaEncoder
-BufferCodec
-ProtocolLogger
-DesyncDetector
-CompatibilityRegistry
-```
-
-## How To Master It
-
-Practice in this order:
-
-1. Wrap one RemoteEvent behind a typed API.
-2. Add runtime schema validation.
-3. Add rate limiting.
-4. Add sequence numbers.
-5. Add typed rejection reasons.
-6. Add replication deltas.
-7. Add per-player interest filtering.
-8. Add payload size logging.
-9. Add buffer encoding for one measured hot path.
-10. Add decode tests.
-11. Add state checksums.
-12. Add protocol versioning.
-13. Add migration tests.
-14. Add fuzz tests for malformed messages.
-15. Convert one real system away from raw RemoteEvent access.
-
-## Permanent Policy
-
-Use this rule for every future Roblox system:
-
-> If a value crosses the network, it becomes part of a protocol. Protocols must be typed, validated, measured, observable, and secure.
+- [Roblox client-server runtime](https://create.roblox.com/docs/projects/client-server)
+- [Remote events and callbacks](https://create.roblox.com/docs/scripting/events/remote)
+- [RemoteEvent API](https://create.roblox.com/docs/reference/engine/classes/RemoteEvent)
+- [UnreliableRemoteEvent API](https://create.roblox.com/docs/reference/engine/classes/UnreliableRemoteEvent)
+- [Securing the client-server boundary](https://create.roblox.com/docs/scripting/security/client-server-boundary)
+- [Network ownership and movement validation](https://create.roblox.com/docs/scripting/security/network-ownership)
+- [Luau buffer library](https://luau.org/library/#buffer-library)
+- [Roblox server-authority model](https://create.roblox.com/docs/projects/server-authority)

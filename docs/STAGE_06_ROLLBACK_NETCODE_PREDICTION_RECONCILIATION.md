@@ -1,584 +1,134 @@
-# Stage 6: Rollback Netcode, Prediction, and Reconciliation
+# Stage 6: Prediction, Reconciliation, Lag Compensation, and Rollback
 
-Rollback netcode is not a single trick. It is the result of disciplined state architecture, typed inputs, fixed ticks, snapshots, replay, authority, prediction, reconciliation, and presentation smoothing. In Roblox, it must be designed carefully because engine physics, replication, and client authority can easily fight the model.
+Latency techniques solve different problems. A Roblox game should use only the techniques its mechanics need and its simulation can support.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> The server owns truth. The client may predict responsiveness. Rollback and reconciliation must operate on explicit typed simulation state, not hidden Roblox Instance behavior.
+## Separate the terms
 
-## 1. Server Authority
+- **Interpolation** renders between known samples, usually adding delay for smoothness.
+- **Extrapolation** estimates beyond the newest sample and may need correction.
+- **Client prediction** immediately applies local input before authoritative confirmation.
+- **Reconciliation** compares predicted and authoritative outcomes and corrects disagreement.
+- **Lag compensation** evaluates an action against bounded historical server-known state.
+- **Rollback/resimulation** restores earlier state and replays later inputs/events.
 
-Server authority means the server decides the real outcome of gameplay.
+You can use interpolation without prediction, prediction without full rollback, or lag-compensated hit checks without rewinding the whole world.
 
-Apply it by making clients send intent, not final results.
+## Authority
 
-Used for:
+For competitive/shared outcomes, the server should decide what is accepted. The client legitimately owns local input collection and presentation and may predict responsiveness. “Server authoritative” does not mean every calculation must run only on the server; it means the server’s admitted result wins.
 
-- weapon firing
-- damage
-- ammo
-- movement validation
-- hit validation
-- ability activation
-- inventory
-- economy
-- objectives
+The server must not trust a client timestamp, position, hit, or sequence merely because it is well typed. Map client data into bounded server history and validate it against server-known context.
 
-Practice:
+## Inputs and acknowledgement
 
-Build a dash request where the client sends `DashRequested`. The server checks cooldown, player state, direction, stamina, and distance before committing the dash.
+A prediction protocol commonly needs:
 
-Mastery rule:
+- a per-session sequence or tick identifier;
+- the minimal input/intent;
+- server acknowledgement of processed input;
+- bounded pending-input history;
+- duplicate/old/future handling;
+- a reset policy for wrap, respawn, teleport, or protocol change.
 
-The client may say "I want to do this." The server decides whether it happened.
+Sequence numbers do not prove honesty; they help ordering and deduplication. Avoid sending client-authored outcomes such as final damage or currency.
 
-## 2. Input Commands
+## Fixed steps and determinism
 
-Input commands are compact records of player intent at a specific time or tick.
+A fixed step makes the application update interval explicit. It does not guarantee identical results across client/server, devices, engine versions, or Roblox physics.
 
-Apply it by converting raw input into typed commands:
+Full deterministic replay requires control over all state inputs, iteration order, random sources, numerical behavior, and side effects. When that boundary cannot be made repeatable, reconcile authoritative snapshots instead of claiming deterministic rollback.
 
-```lua
-export type InputCommand = {
-	playerId: PlayerId,
-	sequence: number,
-	clientTick: number,
-	moveX: number,
-	moveZ: number,
-	buttons: number,
-	aimYaw: number,
-	aimPitch: number,
-}
-```
+## Snapshot design
 
-Used for:
+Snapshot only the state needed to restore the chosen simulation boundary. Define:
 
-- movement
-- dashing
-- fighting games
-- weapon fmakeiring
-- vehicle input
-- rollback replay
-- prediction
+- frame/tick identity;
+- included/excluded fields;
+- full versus delta encoding;
+- base snapshot for each delta;
+- retention limit and memory budget;
+- restore validation;
+- behavior when a base or frame is missing.
 
-Practice:
+Do not snapshot Instances, connections, coroutines, metatables, UI, or service objects as if they were portable simulation data.
 
-Record 120 input commands for one player. Replay them into a simple movement simulation and prove the same final position is produced.
+## Correction policies
 
-Mastery rule:
+Different state needs different correction:
 
-Rollback replays commands, not key presses scattered across scripts.
+- invisible/internal state may snap immediately;
+- camera and render transforms may blend;
+- collision-critical state may need an immediate authoritative correction;
+- small error may be tolerated until a threshold;
+- repeated disagreement may disable prediction for that session.
 
-## 3. Fixed Tick Simulation
+Smoothing presentation must not leave authoritative collision or rewards in a fake intermediate state.
 
-Fixed tick simulation advances gameplay in equal time steps.
+## Lag compensation
 
-Apply it by running simulation at a stable rate, such as 30 or 60 ticks per second.
+Historical validation trades attacker fairness against target fairness. The history window must be based on the game’s latency policy and measured conditions—not a copied “200 ms” constant.
 
-Used for:
+Validate:
 
-- rollback
-- prediction
-- replay tests
-- projectile simulation
-- combat validation
-- vehicle correction
-- deterministic cooldowns
+- whether the requested historical time is inside the accepted window;
+- which server snapshot it maps to;
+- weapon cadence/ammo/state at that time;
+- origin and direction tolerances;
+- target eligibility and world geometry policy;
+- discontinuities such as respawn, teleport, or invulnerability.
 
-Practice:
+Roblox physics history is not automatically reconstructible. Store simplified hit volumes or other bounded server data when exact engine rewind is infeasible.
 
-Create a fixed 30 Hz simulation loop. Feed it the same input commands twice and verify identical output.
+## Roblox’s server-authority model
 
-Mastery rule:
+Roblox now documents an engine server-authority/prediction model using settings such as fixed simulation, `BindToSimulation()`, predicted Instances, rollback/resimulation, and synchronized attributes. Treat it as a distinct engine feature with current setup requirements and limitations—not proof that a custom rollback architecture is obsolete or that old advice applies unchanged.
 
-Rollback needs discrete frames. Arbitrary waits and frame-dependent deltas make replay unreliable.
+If adopting it:
 
-## 4. State Snapshots
+- verify current feature availability and production status;
+- follow its prediction and attribute limits;
+- keep simulation writes in the documented simulation callbacks;
+- test misprediction, streaming, physics, and unsupported APIs in Studio and live-like sessions.
 
-Snapshots capture the simulation state at a tick so the system can restore it later.
+## When not to use rollback
 
-Apply it by storing only serializable simulation data:
+Avoid full rollback when:
 
-- entity positions
-- velocities
-- health
-- ammo
-- cooldowns
-- status effects
-- active projectiles
-- sequence numbers
+- ordinary interpolation is acceptable;
+- the mechanic is turn-based or low frequency;
+- Roblox physics dominates the result and cannot be replayed reliably;
+- snapshots/history exceed memory or complexity budgets;
+- reconciliation can correct a small predicted subset;
+- durable/economy effects cannot safely be replayed.
 
-Used for:
+## Practice project
 
-- rollback
-- replay
-- desync debugging
-- late join recovery
-- correction
-- test fixtures
+Build a one-dimensional pure-data movement simulation:
 
-Practice:
+1. server-authoritative input processing;
+2. client prediction;
+3. acknowledgement and pending input replay;
+4. injected delay/jitter/loss in a test transport;
+5. bounded history and correction logs.
 
-Store the last 60 ticks of simplified combat state. Restore tick 40, replay ticks 41-60, and compare the final state.
+Then compare it with interpolation-only presentation. Do not involve Humanoid/physics until the pure-data protocol is correct. If testing Roblox server authority, make that a separate experiment with its documented flags.
 
-Mastery rule:
+## Completion evidence
 
-Snapshot data, not objects, Instances, connections, coroutines, or metatables.
+You understand this stage when you can:
 
-## 5. Client Prediction
+- distinguish all six latency techniques;
+- justify which subset the mechanic needs;
+- state the exact replay boundary and sources of nondeterminism;
+- bound history, pending inputs, and lag compensation;
+- separate authoritative correction from visual smoothing;
+- demonstrate behavior under delay, jitter, duplication, reordering, and loss appropriate to the chosen transport.
 
-Client prediction simulates expected local results immediately so gameplay feels responsive.
+## Primary references
 
-Apply it by letting the client predict movement, dash, recoil, projectiles, or ability startup while waiting for server confirmation.
-
-Used for:
-
-- movement
-- dashing
-- shooting feel
-- melee startup
-- vehicle steering
-- camera/recoil presentation
-- sports mechanics
-
-Practice:
-
-Make a client-predicted dash. The client moves immediately, sends the input command, and stores pending commands until the server confirms.
-
-Mastery rule:
-
-Prediction improves feel. It does not grant authority.
-
-## 6. Server Reconciliation
-
-Reconciliation corrects the client when server truth disagrees with prediction.
-
-Apply it by sending authoritative state plus the last processed input sequence. The client rewinds to that state and reapplies unconfirmed local inputs.
-
-Used for:
-
-- movement correction
-- dash correction
-- projectile correction
-- vehicle correction
-- combat state correction
-- ability cancellation
-
-Practice:
-
-Simulate server rejection of every third dash. The client should correct to server state, replay remaining valid inputs, and smooth the visual correction.
-
-Mastery rule:
-
-A correction is not a failure. It is the normal cost of predicting before truth arrives.
-
-## 7. Rollback and Replay
-
-Rollback restores a previous state, inserts or corrects an input, and replays forward.
-
-Apply it when late information changes the outcome of a previous frame.
-
-Used for:
-
-- fighting games
-- melee hit validation
-- projectile correction
-- dash collisions
-- latency-compensated shots
-- competitive movement
-
-Practice:
-
-Build a two-player 2D hitbox simulation. Store snapshots and inputs. When a delayed punch input arrives, rollback to that tick, apply it, and replay to the present.
-
-Mastery rule:
-
-Rollback is only as good as the determinism of the state it replays.
-
-## 8. Lag Compensation
-
-Lag compensation validates actions against historical server state.
-
-Apply it by keeping short history buffers for target positions, hitboxes, and relevant combat state.
-
-Used for:
-
-- hitscan weapons
-- melee attacks
-- tackles
-- sports collisions
-- ability targeting
-- projectiles with rewind validation
-
-Practice:
-
-Store 200 ms of target hitbox history. When a player fires, validate against the target position at the shooter's reported tick, clamped by server sanity rules.
-
-Mastery rule:
-
-Lag compensation should help honest latency, not allow impossible client claims.
-
-## 9. Presentation Smoothing
-
-Presentation smoothing hides corrections without lying about server truth.
-
-Apply it with interpolation, extrapolation, correction blending, animation masking, and camera-only smoothing.
-
-Used for:
-
-- movement
-- vehicle correction
-- projectile correction
-- hit reactions
-- remote player movement
-- recoil/camera
-
-Practice:
-
-Apply an instant server position correction to simulation state, but visually blend the model over 100 ms unless the error is too large.
-
-Mastery rule:
-
-Correct simulation immediately. Smooth presentation separately.
-
-## 10. Anti-Cheat Constraints
-
-Rollback and prediction must not weaken security.
-
-Apply strict server validation:
-
-- input rate
-- sequence order
-- movement distance
-- aim limits
-- cooldowns
-- resource costs
-- line of sight
-- hitbox sanity
-- historical tick bounds
-- replay attack protection
-
-Used for:
-
-- combat
-- movement
-- vehicles
-- economy actions
-- competitive systems
-- trading
-
-Practice:
-
-Reject input commands that are too old, too far in the future, out of sequence, too frequent, or physically impossible.
-
-Mastery rule:
-
-Prediction is for responsiveness. Validation is for truth.
-
-## Compatibility With ECS
-
-Rollback is easiest when simulation state is already ECS-shaped.
-
-ECS provides:
-
-```text
-Entity ids
-Plain components
-System phases
-Mutation pipeline
-Snapshots
-Queries
-Debug inspection
-```
-
-Rollback provides:
-
-```text
-Input history
-State history
-Replay
-Correction
-Desync detection
-Historical validation
-```
-
-The correct relationship:
-
-- rollback snapshots store ECS component data
-- systems run in fixed deterministic phases
-- replay uses the same mutation pipeline as live simulation
-- entity ids remain stable across snapshot/restore
-- presentation components are excluded or separated
-
-Policy:
-
-> Rollback should replay ECS simulation, not Roblox presentation.
-
-## Compatibility With OOP
-
-OOP owns the services around rollback.
-
-OOP provides:
-
-```text
-PredictionService
-RollbackService
-SnapshotStore
-InputBuffer
-NetworkChannel
-PresentationCorrector
-HitValidationService
-```
-
-Rollback provides:
-
-```text
-Commands
-Snapshots
-Replay
-Reconciliation
-History windows
-Correction results
-```
-
-The correct relationship:
-
-- services own buffers and lifecycle
-- adapters translate Roblox input into commands
-- runtime objects do not store authoritative rollback state
-- services expose narrow typed APIs
-- cleanup clears per-player histories
-
-Policy:
-
-> OOP owns rollback machinery. ECS owns rollback data.
-
-## Compatibility With Scheduling
-
-Rollback depends on scheduling discipline.
-
-Scheduling provides:
-
-```text
-Fixed ticks
-System order
-Input sampling
-Network flush phases
-Replay loops
-Correction timing
-Presentation phases
-```
-
-Rollback provides:
-
-```text
-Frame history
-Input sequence
-Deterministic replay
-Server reconciliation
-Lag compensation
-```
-
-The correct relationship:
-
-- input is sampled before simulation
-- commands are applied in tick order
-- snapshots are captured at tick boundaries
-- replication flushes after state commit
-- presentation smoothing runs after correction
-
-Policy:
-
-> If tick order is unclear, rollback correctness is unclear.
-
-## Compatibility With Runtime Contracts
-
-Rollback handles untrusted timing-sensitive data, so contracts are mandatory.
-
-Runtime contracts provide:
-
-```text
-Input validation
-Snapshot admission
-Buffer decode checks
-Sequence checks
-Historical tick bounds
-Correction result validation
-```
-
-Rollback provides:
-
-```text
-Commands
-History
-Replay
-Correction
-Prediction
-Lag compensation
-```
-
-Policy:
-
-> Every replayed command must pass the same authority contract as a live command.
-
-## Compatibility With Typed Luau
-
-Typed Luau makes rollback records explicit.
-
-Types provide:
-
-```text
-InputCommand
-Snapshot
-FrameId
-SequenceId
-PredictionState
-Correction
-RollbackResult
-HitValidationResult
-```
-
-Rollback provides:
-
-```text
-The runtime behavior behind those contracts
-```
-
-Policy:
-
-> Rollback data structures must be typed before they are optimized or buffer-packed.
-
-## For Gunkits
-
-Apply rollback concepts to:
-
-- fire input sequence
-- aim command records
-- ammo/cooldown validation
-- hitscan lag compensation
-- projectile history
-- damage authority
-- hitmarker prediction
-- recoil presentation
-- server correction
-- anti-cheat validation
-
-Strong design:
-
-```text
-Client sends typed FireCommand
-Server validates sequence, cooldown, ammo, owner, and aim sanity
-Server checks historical hitbox state for lag compensation
-Damage transaction commits on server
-Client predicts presentation only
-Correction updates client mirror state
-```
-
-## For Prompt Systems
-
-Most prompt systems do not need full rollback, but they need prediction discipline.
-
-Apply to:
-
-- local prompt UI responsiveness
-- server interaction validation
-- hold-duration confirmation
-- cancellation on movement/removal
-- server rejection feedback
-- cooldown correction
-
-Policy:
-
-Prompt UI may predict affordances. Prompt outcomes remain server-authoritative.
-
-## For Vehicles
-
-Vehicles are one of the hardest Roblox rollback-adjacent domains.
-
-Apply to:
-
-- input command recording
-- steering/throttle prediction
-- server correction
-- interpolation
-- authority handoff
-- physics ownership sanity
-- suspension telemetry
-- collision validation
-
-Policy:
-
-If Roblox physics is too nondeterministic for full rollback, use prediction/reconciliation with simplified authoritative state and presentation smoothing.
-
-## The Indefinite Framework
-
-Your long-term Roblox framework should include:
-
-```text
-InputBuffer
-CommandSchema
-FixedTickSimulator
-SnapshotStore
-ReplayRunner
-PredictionService
-ReconciliationService
-LagCompensationService
-HistoryBuffer
-CorrectionSmoother
-DesyncDetector
-RollbackDebugger
-```
-
-Each piece has a permanent role:
-
-- `InputBuffer` stores ordered commands.
-- `CommandSchema` defines typed inputs.
-- `FixedTickSimulator` advances state.
-- `SnapshotStore` captures history.
-- `ReplayRunner` restores and reapplies inputs.
-- `PredictionService` runs client-local expected state.
-- `ReconciliationService` applies server truth.
-- `LagCompensationService` validates historical hits.
-- `HistoryBuffer` stores bounded past state.
-- `CorrectionSmoother` hides visual corrections.
-- `DesyncDetector` compares checksums or state signatures.
-- `RollbackDebugger` reproduces frame history.
-
-## How To Master It
-
-Practice in this order:
-
-1. Build a fixed-tick 2D movement simulation.
-2. Record typed input commands.
-3. Replay commands deterministically.
-4. Add snapshots.
-5. Restore a snapshot and replay forward.
-6. Add client prediction.
-7. Add server reconciliation.
-8. Add visual correction smoothing.
-9. Add sequence numbers.
-10. Add input validation and rate limits.
-11. Add lag-compensated hitscan validation.
-12. Add rollback for a simple melee hitbox.
-13. Add debug frame history.
-14. Add desync checksums.
-15. Buffer-pack input commands only after the typed table version is correct.
-
-The best first real project is a simple dash or top-down movement simulation. Then apply lag compensation to a hitscan weapon. Only then attempt more complex rollback combat.
-
-## Permanent Policy
-
-Use this rule for every future Roblox system:
-
-> If a mechanic needs instant feel under latency, design prediction first. If it needs fair historical validation, design lag compensation. If it needs late input to change past outcomes, design rollback.
-
-The true mastery is combining the first six stages:
-
-- ECS defines rollback-friendly state.
-- OOP owns rollback services and adapters.
-- Scheduling creates fixed ticks and replay order.
-- Runtime contracts protect input and snapshot boundaries.
-- Static types define command, snapshot, and correction records.
-- Rollback turns those pieces into responsive, fair multiplayer.
-
-When these six agree, Roblox systems can feel responsive without surrendering authority.
+- [Roblox server-authority model](https://create.roblox.com/docs/projects/server-authority)
+- [Roblox client-server runtime](https://create.roblox.com/docs/projects/client-server)
+- [Roblox remote events and callbacks](https://create.roblox.com/docs/scripting/events/remote)
+- [Roblox network ownership and movement validation](https://create.roblox.com/docs/scripting/security/network-ownership)

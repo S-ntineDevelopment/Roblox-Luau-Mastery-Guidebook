@@ -1,589 +1,201 @@
 # Roblox Networking Mastery Ladder
 
-This ladder starts with basic Roblox networking hygiene and climbs toward advanced, production-grade multiplayer architecture. It should influence every system that crosses the client/server boundary.
+Networking mastery is the ability to choose the smallest correct communication model, validate hostile input, and prove behavior under real latency/scale. It is not measured by how many custom codecs, buffers, remotes, or rollback systems a project contains.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) and [Stage 8](STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md) first.
 
-> The network is a typed protocol, not a pile of RemoteEvents. Every message must have an owner, schema, validation rule, rate policy, authority boundary, and compatibility plan.
+## Level 0: Client-server and replication model
 
-## 1. RemoteEvent and RemoteFunction Fundamentals
+Learn:
 
-Apply it by learning exactly when to use `RemoteEvent`, `RemoteFunction`, Bindables, Attributes, ValueObjects, and Roblox's built-in replication.
+- which scripts run on server/client;
+- what ReplicatedStorage, ServerStorage, ServerScriptService, PlayerScripts, and PlayerGui imply;
+- DataModel/property/physics replication;
+- StreamingEnabled and missing/streamed Instances;
+- that replicated client code/data can be inspected and changed locally.
 
-Used for:
+Practice: in a multi-client Studio session, change a property on server and client and record exactly where it appears. Repeat with an Attribute and a streamed Workspace object.
 
-- Client input.
-- UI requests.
-- Server notifications.
-- One-way state updates.
-- Rare request/response flows.
+Completion evidence: explain why “the client changed it” does not imply the server accepted it, and why a replicated ModuleScript is not secret.
 
-Practice:
+## Level 1: Remote primitives
 
-Create one client-to-server RemoteEvent for requesting an interaction, one server-to-client RemoteEvent for showing a result, and one RemoteFunction only for a low-frequency query. Then rewrite the RemoteFunction flow as an async RemoteEvent pair to understand the tradeoff.
+Know the documented semantics:
 
-Mastery rule:
+| Primitive | Direction | Yield | Delivery/order |
+| --- | --- | --- | --- |
+| RemoteEvent | either direction, one-way | sender does not wait for reply | standard reliable event semantics; engine buffering/throttling still applies |
+| RemoteFunction | either direction, request/reply | invoker yields | failure/disconnect/never-return risks matter |
+| UnreliableRemoteEvent | either direction, one-way | no reply wait | may drop and reorder |
 
-Do not use RemoteFunctions for high-frequency gameplay, combat, movement, or anything that can block critical execution.
+Use RemoteFunctions when a bounded synchronous answer is genuinely useful and the caller can tolerate yielding/failure. Frequency alone is not the deciding rule. Avoid critical server-to-client `InvokeClient()` because the client can error, disconnect, or never return.
 
-## 2. Authority Boundaries
+Current documented UnreliableRemoteEvent payloads over 1,000 bytes are dropped, and client-to-server remote calls have platform throttling. Treat numbers as current platform limits to recheck, not architecture constants.
 
-Apply it by deciding which side is allowed to originate, validate, mutate, and replicate each piece of state.
+Practice: implement one request as an event/result pair and a client-to-server RemoteFunction. Test missing handlers, server error, client disconnect, timeout at the application layer, and duplicate requests.
 
-Used for:
+## Level 2: Intent and authority
 
-- Combat.
-- Inventory.
-- Currency.
-- Movement.
-- Trading.
-- Match state.
-- Ability activation.
+Classify every value:
 
-Practice:
+- client input/intent;
+- server-authoritative shared/durable outcome;
+- client-local presentation;
+- predicted state awaiting correction;
+- cached or replicated view.
 
-Make a table with three columns: client may request, server validates, server commits. Fill it for damage, healing, item pickup, item purchase, dash movement, projectile firing, and quest completion.
+The server should validate requests that affect shared, competitive, privileged, or durable outcomes. It need not author camera motion, local menu state, or every cosmetic effect.
 
-Mastery rule:
+Practice: replace a client-reported purchase result or hit result with a client request and server-owned calculation.
 
-Clients can request intent. Servers own truth.
+## Level 3: Runtime validation and abuse resistance
 
-## 3. Typed Network Schemas
+For each client-triggered path validate the relevant layers:
 
-Apply it by defining every network message as a named typed contract with payload shape, direction, and validation.
+1. type, shape, depth, count, string/buffer length;
+2. finite numeric values and domain ranges;
+3. rate and amplification cost;
+4. sequence/session freshness if ordering matters;
+5. permission, ownership, state, distance, target, and resources;
+6. authoritative commit and bounded diagnostics.
 
-Used for:
+Validate ProximityPrompts, ClickDetectors, touches, and network-owned physics consequences too; client-triggerable engine events are not automatically trustworthy.
 
-- Preventing malformed payloads.
-- Versioning protocols.
-- Securing RemoteEvents.
-- Making refactors safer.
-- Supporting generated docs and tooling.
+Practice: fuzz missing/wrong/huge/deep/NaN/infinite/duplicate/stale values and prove that rejection happens before expensive work.
 
-Practice:
+## Level 4: Message contracts
 
-Define schemas for:
+Document only the fields the message needs:
 
-- `AbilityRequested`
-- `AbilityAccepted`
-- `AbilityRejected`
-- `EntitySnapshot`
-- `InventoryDelta`
+```text
+name/direction
+payload and validator
+authority
+rate/burst
+ordering/duplicate behavior
+reliability
+recipients
+version if coexistence requires it
+diagnostics/privacy
+```
 
-Write runtime validators for them before any server handler trusts the payload.
+Static Luau types describe checked producers. Runtime validators admit dynamic/hostile values.
 
-Mastery rule:
+Practice: create a small message catalog and a test that every registered client-to-server message has a server validator and rate policy.
 
-No anonymous remote payloads. If a message crosses the network, it deserves a name and a schema.
+## Level 5: Engine versus custom replication
 
-## 4. Rate Limiting and Abuse Control
+Before sending a custom update, ask:
 
-Apply it by enforcing per-player and per-message budgets on the server.
+- is the Instance/property already replicated?
+- can the receiver derive it?
+- does an Attribute fit a small Instance-associated value?
+- does streaming already provide spatial relevance?
+- is custom owner/team/private filtering required?
 
-Used for:
+Do not stamp Attributes every frame without measurement. Also do not repeat the outdated rule that attributes can never hold authoritative gameplay data: in the current server-authority prediction model, documented attributes on predicted Instances can be synchronized simulation state.
 
-- Anti-spam.
-- Exploit resistance.
-- Combat protection.
-- Inventory safety.
-- Server performance.
+Practice: compare a low-rate value via Attribute, RemoteEvent, and existing property replication. Record semantics and encoded/network cost rather than declaring a winner.
 
-Practice:
+## Level 6: Interest, fan-out, and budgets
 
-Build a token bucket limiter for one RemoteEvent. Allow 10 requests per second with a burst of 20. Reject and log excess requests.
+Estimate custom message cost as:
 
-Mastery rule:
+```text
+recipients x frequency x encoded payload
+```
 
-Validation proves whether a request is legal. Rate limiting proves whether the request volume is acceptable.
+Then include serialization/compression, validation, history, allocation, and fan-out CPU. `FireAllClients()` is correct when all clients need the event; `FireClient()`/selected recipients are better when they do not.
 
-## 5. Sequencing, Acknowledgement, and Idempotency
+Interest management reduces application disclosure and traffic but cannot hide information already replicated to the client.
 
-Apply it by adding sequence numbers and request ids to important messages.
+Practice: produce per-message counts/bytes/recipients in a representative multi-client session.
 
-Used for:
+## Level 7: Tables, buffers, batching, and quantization
 
-- Avoiding duplicate purchases.
-- Ordering inputs.
-- Matching responses.
-- Replaying rollback commands.
-- Detecting missing updates.
+Buffers are fixed-size byte blocks. They are a representation choice, not a mastery requirement.
 
-Practice:
+Use them when measured frequency/volume/CPU/allocation justifies:
 
-Create a request id for inventory actions. Send the same request twice and make the server apply it once. Then return the same result for repeated ids.
+- known layout/version;
+- zero-based offsets and bounds checks;
+- maximum record count;
+- numeric range/NaN/infinity policy;
+- quantization error budget;
+- malformed decode behavior;
+- round-trip fixtures.
 
-Mastery rule:
+Roblox encodes and compresses certain remote values, including buffers, so a hand-counted byte layout does not by itself prove on-wire savings. Measure representative transport behavior.
 
-Any message that changes durable or authoritative state needs idempotency or a clear duplicate policy.
+Batching can reduce per-message overhead but increases latency and worst-case payload/processing. Bound batch age and size.
 
-## 6. Delta Replication
+Practice: encode the same representative records as tables and buffers, then compare correctness, encoded/network measurements, CPU, allocations, and debugging cost.
 
-Apply it by sending only what changed instead of full state every time.
+## Level 8: Deltas and snapshots
 
-Used for:
+Deltas need a known base. Define acknowledgement or recovery with periodic full snapshots. A full record may be smaller/safer when most fields change or the record is tiny.
 
-- Inventory updates.
-- Entity components.
-- Status effects.
-- Match score.
-- Quest state.
-- Cooldowns.
+Practice: deliberately drop/reorder an unreliable delta and demonstrate recovery rather than assuming delivery.
 
-Practice:
+## Level 9: Latency presentation
 
-Create a simple entity snapshot with `Health`, `Position`, and `Team`. Track the previous sent version and send only changed fields to each client.
+Choose separately among interpolation, extrapolation, prediction, reconciliation, lag compensation, and rollback. See [Stage 6](STAGE_06_ROLLBACK_NETCODE_PREDICTION_RECONCILIATION.md).
 
-Mastery rule:
+ECS is not a prerequisite. Plain records, services, or objects can provide snapshot state. Fixed ticks are not a determinism guarantee.
 
-Full snapshots are useful for join, recovery, and debugging. Deltas are for regular updates.
+Practice: compare interpolation-only and prediction/reconciliation for one pure-data movement mechanic under injected delay/jitter/loss.
 
-## 7. Buffer Networking
+## Level 10: Physics and server authority
 
-Buffer networking means packing network payloads into compact binary buffers instead of sending large nested Lua tables.
+Understand client network ownership of unanchored assemblies and its security impact. Movement validation is mechanic-specific; universal speed thresholds fail around vehicles, teleports, latency, and physics impulses.
 
-Apply it by using Roblox's `buffer` type for high-frequency or high-volume messages. Design a binary layout for each packed message and read/write fields at known offsets.
+Evaluate the current Roblox server-authority model separately. It has documented setup, prediction, simulation callback, and Attribute constraints that older custom-netcode advice does not cover.
 
-Used for:
+Practice: test a network-owned assembly, server-owned alternative, and current server-authority experiment. Measure responsiveness and validate outcomes.
 
-- Entity snapshots.
-- Projectile state.
-- Movement inputs.
-- Combat hit data.
-- Rollback frame inputs.
-- Compressed replication streams.
-- Large batches of small records.
+## Level 11: Compatibility and operations
 
-Practice:
+Versioning is needed when incompatible producers/consumers/data can coexist: old live servers, teleport payloads, saved records, queues, external workers, or separately deployed packages.
 
-Create a packed movement input buffer:
+Use optional fields, explicit versions, dual-read transitions, or session rejection as appropriate. Do not add elaborate migration machinery where deployment makes coexistence impossible.
 
-- 1 byte: buttons bitmask.
-- 2 bytes: input sequence number.
-- 2 bytes: yaw angle quantized to `0-65535`.
-- 2 bytes: pitch angle quantized to `0-65535`.
-- 4 bytes: client tick.
+Track rejection rates, payload sizes, recipient counts, queue/history sizes, and protocol version with bounded cardinality/privacy.
 
-Then decode it server-side and compare its byte size against the same payload sent as a table.
+## Common corrections
 
-Mastery rule:
+| Incorrect shortcut | Accurate replacement |
+| --- | --- |
+| “Use RemoteEvents for gameplay; RemoteFunctions are bad.” | Choose one-way versus bounded request/reply semantics; avoid critical server-to-client invocation. |
+| “Buffers are faster/smaller.” | They may be; prove end-to-end cost for representative payloads. |
+| “Send only deltas.” | Deltas require a base/recovery and can cost more than small full records. |
+| “Advanced networking requires ECS.” | ECS is one state organization; it is not a network prerequisite. |
+| “Fixed tick means deterministic.” | It fixes step interval, not all inputs/numerics/physics/order. |
+| “The server owns everything.” | The server owns admitted shared/competitive/durable outcomes; clients own local presentation/input and may predict. |
+| “Never use Attributes for gameplay.” | Choose by authority/rate/model; current server-authority predicted simulation explicitly supports documented Attribute state. |
+| “Sequence numbers make input safe.” | They help order/dedup; semantic validation is still required. |
 
-Use buffers when message frequency, batch size, or bandwidth pressure justifies the complexity. Keep layouts versioned, documented, and tested.
+## Mastery project
 
-## 8. Client Prediction and Server Reconciliation
+Build a small secure interaction plus one latency-sensitive pure-data mechanic. Provide:
 
-Apply it by letting the client simulate responsive local behavior immediately, then correcting from server-confirmed state.
+- message/authority table;
+- runtime validators and rate limits;
+- table versus buffer measurement where volume justifies it;
+- recipient/frequency/payload budget;
+- hostile-input fixtures;
+- delay/jitter/loss tests appropriate to transport;
+- lifecycle cleanup on leave/respawn/destroy;
+- explicit limitations and Studio/live checks not run.
 
-Used for:
+Mastery is demonstrated by rejecting unnecessary complexity as confidently as implementing necessary complexity.
 
-- Movement.
-- Dashing.
-- Projectiles.
-- Fighting games.
-- Racing.
-- Sports mechanics.
-- Fast ability activation.
+## Primary references
 
-Practice:
-
-Build a dash mechanic. The client predicts the dash instantly and sends an input command. The server validates it, simulates the same command, and returns an authoritative result. If the client differs, reconcile smoothly.
-
-Mastery rule:
-
-Prediction is presentation until the server confirms it. Never let predicted client state become authoritative.
-
-## 9. Rollback, Replay, and Lag Compensation
-
-Apply it by storing past simulation states and input history. When late authoritative data arrives, restore an earlier frame and replay forward.
-
-Used for:
-
-- Hit validation.
-- Competitive combat.
-- Fighting games.
-- Projectile correction.
-- High-speed movement.
-- Latency-tolerant interactions.
-
-Practice:
-
-Store 30 ticks of entity position history on the server. When a player fires, validate the hit against where the target was at the shooter's reported tick, within strict sanity limits.
-
-Mastery rule:
-
-Rollback requires deterministic simulation boundaries. If Roblox physics is not deterministic enough for the mechanic, treat it as presentation or approximation and keep authoritative simulation simpler.
-
-## 10. Protocol Observability, Fuzzing, and Migration
-
-Apply it by treating the network layer as a product-level protocol with logs, metrics, compatibility, and hostile-input testing.
-
-Used for:
-
-- Debugging desyncs.
-- Detecting exploit patterns.
-- Rolling out updates.
-- Maintaining old clients.
-- Measuring bandwidth.
-- Finding schema bugs.
-
-Practice:
-
-Build a network inspector that records message name, direction, byte size, validation result, player, sequence number, and processing time. Then fuzz each server message with malformed data and prove it fails safely.
-
-Mastery rule:
-
-You do not truly own a network protocol until you can inspect it, version it, test it, and migrate it.
-
-## Buffer Networking Study Path
-
-Learn buffer networking in this order:
-
-1. Compare table payload size versus buffer payload size.
-2. Pack one fixed-size input command.
-3. Pack a batch of input commands.
-4. Quantize angles, positions, and normalized values.
-5. Add a version byte.
-6. Add sequence numbers.
-7. Add payload length checks.
-8. Add decode failure handling.
-9. Add automated round-trip tests.
-10. Add bandwidth metrics per message type.
-
-Completion standard:
-
-You understand Roblox networking when every RemoteEvent has a schema, every server handler validates trust, high-frequency data has a compact representation, and authoritative gameplay can tolerate latency without giving clients ownership of truth.
-
-## Sources of Mastery Required
-
-These are the underlying areas you need to study to understand the true benefit and edge of advanced networking. The goal is not to memorize APIs. The goal is to know why the architecture exists, when it wins, and what tradeoffs it creates.
-
-## 1. Roblox Replication Model
-
-You need to understand what Roblox already replicates before building custom networking.
-
-Master:
-
-- Instance replication.
-- Property replication.
-- Physics replication.
-- Network ownership.
-- StreamingEnabled.
-- Attributes.
-- CollectionService tags.
-- RemoteEvents.
-- RemoteFunctions.
-- BindableEvents and BindableFunctions.
-
-Why it matters:
-
-If Roblox already replicates something safely and cheaply, duplicating it through remotes can waste bandwidth and create desyncs. If Roblox replication is not authoritative enough for a mechanic, custom networking becomes necessary.
-
-## 2. Client/Server Authority
-
-You need to understand who owns truth for every action.
-
-Master:
-
-- Client intent.
-- Server validation.
-- Server commits.
-- Client prediction.
-- Server correction.
-- Trust boundaries.
-- Exploit assumptions.
-- Impossible-state rejection.
-
-Why it matters:
-
-Most multiplayer bugs and exploits come from unclear ownership. Advanced networking is not about sending data faster first; it is about sending the right data from the right authority.
-
-## 3. Luau Type System
-
-You need typed contracts so network messages do not become anonymous tables.
-
-Master:
-
-- `--!strict`.
-- Exported types.
-- Structural typing.
-- Optional fields.
-- Union types.
-- Discriminated unions.
-- Generic validators.
-- Branded ids.
-- Typed RemoteEvent wrappers.
-
-Why it matters:
-
-Networking is an API between machines. Typed schemas make that API explicit, reviewable, testable, and harder to accidentally break.
-
-## 4. Binary Data and Buffers
-
-You need to understand binary layout before buffer networking is useful.
-
-Master:
-
-- Bytes.
-- Bits.
-- Offsets.
-- Endianness concepts.
-- Integer sizes.
-- Float sizes.
-- Signed vs unsigned values.
-- Bitmasks.
-- Packing.
-- Unpacking.
-- Alignment.
-- Fixed-size records.
-- Variable-length records.
-
-Why it matters:
-
-Buffers are powerful because they trade readability for compactness and speed. Without binary discipline, buffers become fragile and harder to debug than tables.
-
-## 5. Quantization and Compression
-
-You need to know how to represent gameplay values with fewer bytes.
-
-Master:
-
-- Mapping floats into integers.
-- Angle quantization.
-- Position quantization.
-- Normalized vector packing.
-- Boolean bit packing.
-- Enum packing.
-- Delta encoding.
-- Run-length encoding.
-- Baseline snapshots.
-- Precision budgets.
-
-Why it matters:
-
-The edge of buffer networking is not just "binary is smaller." The real edge comes from deciding how much precision each gameplay value actually needs.
-
-## 6. Time, Ticks, and Ordering
-
-You need temporal architecture before prediction and rollback can work.
-
-Master:
-
-- Server time.
-- Client time.
-- Render frames.
-- Simulation ticks.
-- Fixed timestep loops.
-- Sequence numbers.
-- Input frames.
-- Clock drift.
-- Jitter.
-- Late packets.
-- Out-of-order messages.
-
-Why it matters:
-
-Networking problems are usually time problems. If your project has no consistent concept of tick order, rollback and reconciliation will be unreliable.
-
-## 7. Deterministic Simulation
-
-You need predictable simulation boundaries for rollback.
-
-Master:
-
-- Deterministic state updates.
-- Pure simulation functions.
-- Seeded randomness.
-- Avoiding hidden global state.
-- Avoiding unordered iteration where order matters.
-- Separating simulation from presentation.
-- Physics approximation.
-- Replay tests.
-
-Why it matters:
-
-Rollback only works when replaying the same inputs from the same state produces the same result. Anything nondeterministic must be isolated or corrected.
-
-## 8. Data-Oriented Architecture and ECS
-
-You need data organized for snapshots, deltas, queries, and replay.
-
-Master:
-
-- Entity ids.
-- Component storage.
-- System phases.
-- Query caching.
-- Mutation staging.
-- State snapshots.
-- Component diffs.
-- Batch processing.
-
-Why it matters:
-
-ECS and data-oriented architecture make networking easier because state is already organized into explicit records instead of hidden inside scattered objects and Instances.
-
-## 9. Security and Exploit Modeling
-
-You need to think like an attacker when designing server handlers.
-
-Master:
-
-- Input spoofing.
-- Remote spam.
-- Replay attacks.
-- Duplicate requests.
-- Impossible movement.
-- Invalid target ids.
-- Economy tampering.
-- Cooldown bypassing.
-- Payload size abuse.
-- Type confusion.
-
-Why it matters:
-
-The client is not trusted. Advanced networking that ignores exploit resistance only makes attacks faster and harder to inspect.
-
-## 10. Performance and Bandwidth Budgeting
-
-You need to measure cost instead of guessing.
-
-Master:
-
-- Message frequency.
-- Payload size.
-- Bytes per second.
-- Per-player budget.
-- Server CPU cost.
-- Serialization cost.
-- Deserialization cost.
-- Memory pressure.
-- Garbage generation.
-- Hot path profiling.
-
-Why it matters:
-
-Optimization without measurement is guesswork. Buffer networking should be introduced because a measured bandwidth or CPU constraint justifies it.
-
-## 11. Reliability Patterns
-
-You need to know which messages must arrive, which may be dropped, and which can be replaced by newer state.
-
-Master:
-
-- Reliable intent messages.
-- Unreliable high-frequency state.
-- Acknowledgements.
-- Retries.
-- Idempotency.
-- Last-write-wins updates.
-- Ordered streams.
-- Unordered streams.
-- Resync snapshots.
-- Recovery after packet loss.
-
-Why it matters:
-
-Not all game data deserves the same reliability model. An inventory purchase and an aim direction update should not be treated the same way.
-
-## 12. Observability and Debug Tooling
-
-You need visibility into the protocol.
-
-Master:
-
-- Message logs.
-- Byte-size counters.
-- Validation failure reports.
-- Per-player traffic summaries.
-- Sequence gap detection.
-- Desync checksums.
-- Replay captures.
-- Latency simulation.
-- Packet loss simulation.
-- Protocol inspectors.
-
-Why it matters:
-
-Advanced networking fails in subtle ways. If you cannot inspect what was sent, decoded, validated, applied, and corrected, you cannot debug it at scale.
-
-## 13. API and Protocol Design
-
-You need to design network messages as long-lived contracts.
-
-Master:
-
-- Message naming.
-- Version fields.
-- Compatibility rules.
-- Deprecation.
-- Feature flags.
-- Optional fields.
-- Required fields.
-- Protocol documentation.
-- Generated wrappers.
-- Migration tests.
-
-Why it matters:
-
-Roblox games evolve while players are active. Protocol design prevents updates from breaking clients, servers, tools, and replay data.
-
-## 14. Testing Discipline
-
-You need proof that networking code works under hostile and unstable conditions.
-
-Master:
-
-- Round-trip encode/decode tests.
-- Schema validation tests.
-- Fuzz tests.
-- Latency tests.
-- Duplicate-message tests.
-- Out-of-order tests.
-- Rollback replay tests.
-- Load tests.
-- Regression captures.
-- Golden packet fixtures.
-
-Why it matters:
-
-Networking bugs often hide until production. Testing must simulate bad timing, bad data, bad order, and bad actors.
-
-## 15. Game Design Sensitivity
-
-You need to know what responsiveness, fairness, and authority mean for the actual mechanic.
-
-Master:
-
-- Perceived responsiveness.
-- Competitive fairness.
-- Hit feel.
-- Correction tolerance.
-- Input buffering.
-- Animation timing.
-- VFX prediction.
-- Server rejection UX.
-- Latency classes.
-- Genre-specific expectations.
-
-Why it matters:
-
-The "best" networking model depends on the game. A fighting game, obby, shooter, tycoon, RPG, and trading system have different tolerance for delay, prediction, correction, and server strictness.
-
-## Mastery Edge
-
-The real edge appears when these sources combine:
-
-1. Roblox replication tells you what not to custom-build.
-2. Authority tells you who is allowed to decide.
-3. Types define the protocol.
-4. Buffers reduce cost.
-5. Quantization makes buffers worth using.
-6. Ticks make time explicit.
-7. Determinism enables rollback.
-8. ECS makes state snapshot-friendly.
-9. Security protects the server.
-10. Performance proves the optimization matters.
-11. Reliability picks the right delivery behavior.
-12. Observability makes bugs explainable.
-13. Protocol design keeps updates compatible.
-14. Testing proves the system survives bad conditions.
-15. Game design decides which tradeoffs are acceptable.
+- [Roblox client-server runtime](https://create.roblox.com/docs/projects/client-server)
+- [Remote events and callbacks](https://create.roblox.com/docs/scripting/events/remote)
+- [RemoteEvent API](https://create.roblox.com/docs/reference/engine/classes/RemoteEvent)
+- [UnreliableRemoteEvent API](https://create.roblox.com/docs/reference/engine/classes/UnreliableRemoteEvent)
+- [Securing the client-server boundary](https://create.roblox.com/docs/scripting/security/client-server-boundary)
+- [Network ownership and movement validation](https://create.roblox.com/docs/scripting/security/network-ownership)
+- [Roblox server-authority model](https://create.roblox.com/docs/projects/server-authority)
+- [Luau buffer library](https://luau.org/library/#buffer-library)

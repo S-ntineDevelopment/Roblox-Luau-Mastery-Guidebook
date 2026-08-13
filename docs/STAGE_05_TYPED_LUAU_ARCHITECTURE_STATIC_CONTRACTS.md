@@ -1,650 +1,150 @@
-# Stage 5: Typed Luau Architecture and Static Contracts
+# Stage 5: Typed Luau and Static Contracts
 
-Typed Luau is not just a bug-catching layer. At mastery level, it becomes an architecture language. It describes what systems may know, what data may cross boundaries, what services expose, what components contain, what messages carry, and what states are legal.
+Luau is gradually and structurally typed. Its type checker can improve editor feedback and refactor safety, but annotations do not validate runtime values, make tables immutable, or create nominal types automatically.
 
-Runtime contracts protect live boundaries. Static contracts shape the code before it runs.
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-Core policy:
+## Type modes and `--!strict`
 
-> Types are architecture. Every important boundary should be visible in Luau's type system before it is enforced at runtime.
+Use `--!strict` where its benefit exceeds the migration cost, especially for shared APIs, network schemas, persistence records, and reusable libraries. A mixed legacy project can adopt strictness at boundaries first.
 
-## 1. Strict Mode Discipline
+Strict mode is not proof of correctness. `any`, unchecked casts, dynamic requires, engine behavior, and unvalidated external data can bypass assumptions.
 
-`--!strict` makes Luau hold modules to a higher standard.
+## Structural typing
 
-Apply it by making shared framework modules strict by default:
+A value satisfies a structural table type when it has the required shape. This works well for small service views, callbacks, and strategy contracts without inheritance.
 
-- component types
-- service APIs
-- network schemas
-- config modules
-- ECS world interfaces
-- scheduler contracts
-- prompt actions
-- weapon contracts
+Width subtyping can let an implementation contain more fields than its public interface. It does not make those fields runtime-private.
 
-Used for:
+Use exact runtime validators when extra fields are a security or forward-compatibility concern; the static structural type alone does not reject a hostile table.
 
-- safer refactors
-- clearer APIs
-- fewer nil mistakes
-- stronger module contracts
-- code review clarity
+## Functions before objects
 
-Practice:
-
-Convert a small service module to `--!strict`. Add explicit parameter and return types until the checker understands the public API.
-
-Mastery rule:
-
-Shared architecture code should be strict first. Feature code should move toward strict as contracts stabilize.
-
-## 2. Structural Typing
-
-Luau uses structural typing: if a value has the right shape, it can satisfy a type.
-
-Apply it by defining behavior contracts by method shape rather than class inheritance.
-
-Used for:
-
-- prompt actions
-- weapon fire modes
-- hit resolvers
-- vehicle strategies
-- permission checks
-- effects
-- adapters
-
-Practice:
-
-Define:
+Polymorphic contracts do not need `self`:
 
 ```lua
-export type PromptAction = {
-	execute: (self: PromptAction, context: InteractionContext) -> ActionResult,
-}
+export type HitResolver = (origin: Vector3, direction: Vector3) -> RaycastResult?
 ```
 
-Then implement three different modules that satisfy the shape without inheriting from a base class.
+Use a method contract when the implementation owns state or identity. Function contracts are often easier to type and compose for stateless behavior.
 
-Mastery rule:
+## Generics
 
-Use structural typing to make composition natural.
+Generics preserve relationships between input and output types in reusable containers and functions. They do not guarantee that a runtime registry value is valid; dynamic registration still needs an admission check when inputs are untrusted or constructed outside checked code.
 
-## 3. Generic Modules
+Avoid making a generic abstraction only to remove two lines of duplicate code. Prefer generics when the same semantic contract genuinely operates over multiple types.
 
-Generics let one module preserve type information for many data shapes.
+## ID types: correction to primitive branding
 
-Apply it to reusable containers:
-
-- registries
-- stores
-- signals
-- result types
-- object pools
-- queues
-- caches
-- resource owners
-
-Used for:
-
-- ECS component stores
-- typed registries
-- scheduler queues
-- network message catalogs
-- config resolvers
-- object pools
-
-Practice:
-
-Build a generic registry:
+This pattern from the earlier curriculum was wrong:
 
 ```lua
-export type Registry<T> = {
-	register: (self: Registry<T>, id: string, value: T) -> (),
-	get: (self: Registry<T>, id: string) -> T?,
-	require: (self: Registry<T>, id: string) -> T,
-}
+-- Do not use this as a primitive brand.
+type EntityId = number & { __brand: "EntityId" }
 ```
 
-Use it for both `PromptAction` and `FireMode`.
+An intersection requires a value to be both a number and a table shape; ordinary Luau values cannot satisfy that nominal-brand intent.
 
-Mastery rule:
+Choose one of two honest approaches.
 
-When a pattern repeats with different value types, make the container generic before duplicating it.
-
-## 4. Branded Ids
-
-Plain strings and numbers are easy to mix up. Branded ids make intent explicit.
-
-Apply it by defining separate id types:
+Zero-allocation alias (documents intent but does not prevent mixing):
 
 ```lua
-export type EntityId = number & {__brand: "EntityId"}
-export type WeaponId = string & {__brand: "WeaponId"}
-export type PromptId = string & {__brand: "PromptId"}
-export type MatchId = string & {__brand: "MatchId"}
+export type EntityId = number
+export type PlayerId = number
 ```
 
-Used for:
-
-- entities
-- players
-- weapons
-- attachments
-- prompts
-- inventory items
-- matches
-- transactions
-- rollback frames
-
-Practice:
-
-Create branded `EntityId`, `WeaponId`, and `ItemId` types. Then prevent a function expecting `WeaponId` from accepting `ItemId`.
-
-Mastery rule:
-
-If two ids have different meanings, give them different types.
-
-## 5. Network Schemas
-
-Network schemas define message names, directions, payloads, and validation.
-
-Apply it by pairing static types with runtime validators.
-
-Used for:
-
-- RemoteEvent payloads
-- buffer layouts
-- request/response ids
-- replication deltas
-- prediction inputs
-- rollback frame commands
-
-Practice:
-
-Define:
+Wrapper record (structurally distinguishes domains but allocates and changes representation):
 
 ```lua
-export type FireRequested = {
-	weaponEntityId: EntityId,
-	sequence: number,
-	clientTick: number,
-	origin: Vector3,
-	direction: Vector3,
-}
+export type EntityId = { kind: "EntityId", value: number }
+export type PlayerId = { kind: "PlayerId", value: number }
 ```
 
-Then create a runtime validator with the same field expectations.
+Use wrapper records only where compile-time domain separation is worth the conversion/storage cost. Runtime validation is still required at network and persistence boundaries.
 
-Mastery rule:
+## Tagged unions
 
-Network types describe what honest code sends. Runtime validators decide what hostile code is allowed to send.
-
-## 6. Service Contracts
-
-Service contracts separate public API from private implementation.
-
-Apply it by exporting a service type that callers use, while implementation details remain local.
-
-Used for:
-
-- damage services
-- prompt services
-- inventory services
-- weapon services
-- vehicle services
-- networking
-- scheduler services
-- ECS worlds
-
-Practice:
-
-Define a `PromptService` public type with only:
-
-- `registerPrompt`
-- `unregisterPrompt`
-- `requestInteraction`
-- `getPromptView`
-
-Keep internal session maps and Roblox adapters private.
-
-Mastery rule:
-
-Callers should depend on the smallest public service type that lets them do their job.
-
-## 7. Type-Safe Configuration
-
-Configs are long-lived contracts. They should be typed.
-
-Apply it by defining one exported config type per feature domain.
-
-Used for:
-
-- weapons
-- attachments
-- prompts
-- abilities
-- vehicles
-- enemies
-- quests
-- shops
-- economy
-
-Practice:
-
-Create a typed weapon config:
+String/boolean singleton types can discriminate table unions:
 
 ```lua
-export type WeaponConfig = {
-	id: WeaponId,
-	displayName: string,
-	fireModeId: string,
-	damage: number,
-	fireInterval: number,
-	magazineSize: number,
-	reloadDuration: number,
-}
+type ReloadState =
+	{ kind: "Idle" }
+	| { kind: "Reloading", endsAt: number }
+	| { kind: "Cancelled", reason: string }
 ```
 
-Then validate every config record at load time.
+Tagged unions help model legal alternatives, but Luau does not turn every `if` chain into a guaranteed exhaustive match automatically. Use a final `else`/assertion and let the checker reveal `never` where practical.
 
-Mastery rule:
+## Results and errors
 
-Config is code-adjacent data. Treat it like an API.
-
-## 8. Result Types
-
-Result types make success and failure explicit.
-
-Apply them instead of returning ambiguous `nil`, strings, or thrown errors for expected failures.
-
-Used for:
-
-- validation
-- transactions
-- prompt interactions
-- purchases
-- weapon firing
-- reload attempts
-- inventory changes
-- matchmaking
-- datastore operations
-
-Practice:
-
-Define:
+Result types are useful for expected failure:
 
 ```lua
 export type Result<T, E> =
-	{ok: true, value: T}
-	| {ok: false, error: E}
+	{ ok: true, value: T }
+	| { ok: false, error: E }
 ```
 
-Use it for `tryFireWeapon`, where failure may be `NoAmmo`, `Cooldown`, `NotEquipped`, or `InvalidOwner`.
+They are not mandatory for every function. Returning `nil` can be clear for a simple lookup; throwing is appropriate for programmer misuse; multiple returns may be idiomatic for a small local API. Choose one convention per boundary and document it.
 
-Mastery rule:
+## Public APIs and privacy
 
-Expected failure should be typed, not guessed.
+An exported type communicates the supported surface. It does not prevent a caller from reaching extra fields on a concrete table if the caller obtains that table with a broader type or uses casts/dynamic code.
 
-## 9. Type Narrowing and Discriminated Unions
+Real encapsulation in Luau is primarily achieved through module scope and which values/functions are returned. Types reinforce that design.
 
-Discriminated unions model legal variants with a tag field.
+## Static and runtime contracts
 
-Apply it to state machines and message variants.
-
-Used for:
-
-- weapon states
-- reload states
-- prompt sessions
-- match lifecycle
-- transaction states
-- vehicle occupancy
-- network messages
-- async operations
-
-Practice:
-
-Define:
-
-```lua
-export type ReloadState =
-	{kind: "Idle"}
-	| {kind: "Reloading", startedAt: number, endsAt: number}
-	| {kind: "Cancelled", reason: string}
-```
-
-Then write code that handles every variant explicitly.
-
-Mastery rule:
-
-If a state has modes, model the modes directly.
-
-## 10. Type-Driven Refactors
-
-Type-driven refactoring means moving architecture safely because the checker reveals all affected boundaries.
-
-Apply it when splitting managers into services, extracting contracts, or converting feature-name conditionals into polymorphic modules.
-
-Used for:
-
-- ECS migration
-- gunkit rewrites
-- prompt framework extraction
-- vehicle service separation
-- network schema changes
-- rollback additions
-- config consolidation
-
-Practice:
-
-Take one loosely typed module and extract:
-
-- public service type
-- config type
-- message type
-- result type
-- state union
-
-Then refactor until all callers compile against the new surfaces.
-
-Mastery rule:
-
-Good types make large refactors mechanical instead of archaeological.
-
-## Compatibility With ECS
-
-Typed Luau makes ECS safer and more inspectable.
-
-ECS provides:
+Pair types with runtime validation when values cross a trust or persistence boundary:
 
 ```text
-Entity ids
-Components
-Systems
-Queries
-Mutation pipelines
-Snapshots
+checked producer -> serialized/dynamic boundary -> runtime validator -> typed internal value
 ```
 
-Types provide:
+Network type annotations describe honest checked code. The server must still validate client payload type, size, range, permission, rate, and state context.
 
-```text
-Component schemas
-Branded ids
-System read/write declarations
-Typed queries
-Snapshot shapes
-Mutation request/result types
-```
+DataStore records require version/shape validation because saved data outlives the code version that wrote it.
 
-The correct relationship:
+## Casts and `any`
 
-- component data has exported types
-- entity ids are branded
-- queries return typed views where practical
-- mutation requests and results are typed
-- snapshots have serializable types
-- component registries validate static and runtime shape
+A cast (`::`) tells the checker to treat a value as another type subject to its cast rules; it does not convert or validate the runtime value. Use casts at proven boundaries and explain the proof.
 
-Policy:
+Prefer `unknown` over `any` for dynamic input because `unknown` must be refined before use. Track `any` at architecture boundaries and remove it when practical.
 
-> ECS state should be plain data, but never vague data.
+## Metatable object typing
 
-## Compatibility With OOP
+Metatable-based objects often need explicit data and method types because `self` inference and metatable typing have specific rules. Follow current Luau object-typing documentation rather than copying an old `typeof(setmetatable(...))` pattern blindly; the type solver evolves.
 
-Typed Luau keeps OOP boundaries honest.
+## Practice project
 
-OOP provides:
+Create a small interaction API with:
 
-```text
-Services
-Controllers
-Adapters
-Runtime objects
-Polymorphic contracts
-Lifecycle
-```
+- one strict public module;
+- a tagged request/result union;
+- a stateless callback contract and a stateful method contract;
+- an `unknown` payload validator;
+- both primitive-alias and wrapper-record ID experiments;
+- a deliberate unsafe cast documented and then removed.
 
-Types provide:
+Run the current type checker. A code example is not verified merely because it looks like Luau.
 
-```text
-Public service APIs
-Constructor dependency shapes
-Interface contracts
-Lifecycle state unions
-Cleanup ownership contracts
-Adapter boundaries
-```
+## Completion evidence
 
-The correct relationship:
+You understand this stage when you can:
 
-- services export narrow public types
-- constructors accept typed dependency contexts
-- polymorphic objects satisfy structural contracts
-- private fields stay private to the module where possible
-- runtime objects are not confused with serializable state
+- explain gradual and structural typing;
+- distinguish static checking from runtime validation and immutability;
+- avoid impossible primitive-intersection brands;
+- choose aliases versus wrapper IDs honestly;
+- model variants with singleton-tagged unions;
+- account for casts, `any`, yields, and mutation that weaken refinements;
+- demonstrate checker output for examples against the active toolchain.
 
-Policy:
+## Primary references
 
-> Objects can vary internally. Their public contracts must stay explicit.
-
-## Compatibility With Scheduling
-
-Typed Luau turns time-based behavior into explicit contracts.
-
-Scheduling provides:
-
-```text
-Operations
-Ticks
-Queues
-Tasks
-Timeouts
-Cooldowns
-Backpressure
-```
-
-Types provide:
-
-```text
-Operation state unions
-Tick ids
-Queue item types
-Timeout result types
-Cooldown state
-Scheduler phase names
-Job contracts
-```
-
-The correct relationship:
-
-- async operations return typed results
-- cancellation has typed reasons
-- queues only accept declared item types
-- scheduler phases are typed constants/unions
-- fake clocks satisfy the same clock contract as real clocks
-
-Policy:
-
-> If timing behavior matters, type the operation state and result.
-
-## Compatibility With Runtime Contracts
-
-Static and runtime contracts should pair together.
-
-Static types provide:
-
-```text
-Author intent
-Editor feedback
-Refactor safety
-API documentation
-```
-
-Runtime contracts provide:
-
-```text
-Boundary protection
-Exploit resistance
-Config admission
-Datastore migration safety
-Buffer decode safety
-```
-
-The correct relationship:
-
-- every important runtime validator should have a matching exported type
-- every network schema should have both a type and validator
-- every dynamic config should have both type and admission check
-- hot paths may use lighter runtime checks after strong admission
-
-Policy:
-
-> Static types are not security. Runtime contracts are not architecture documentation. Use both.
-
-## For Gunkits
-
-Apply typed Luau to:
-
-- weapon config
-- ammo state
-- reload state
-- fire command messages
-- fire result types
-- attachment contracts
-- fire mode contracts
-- hit resolver contracts
-- recoil/spread model contracts
-- damage transaction results
-- client prediction state
-- rollback input records
-
-Strong design:
-
-```text
-WeaponConfig defines design data
-WeaponState defines runtime data
-FireCommand defines client intent
-FireResult defines accepted/rejected output
-FireMode defines polymorphic behavior
-HitResolver defines impact behavior
-DamageTransaction defines server authority result
-```
-
-## For Prompt Systems
-
-Apply typed Luau to:
-
-- prompt config
-- prompt state
-- interaction request messages
-- interaction result types
-- prompt action contracts
-- permission check contracts
-- cooldown state
-- session state unions
-- read-only prompt views
-
-Strong design:
-
-```text
-PromptConfig defines interaction identity
-PromptState defines runtime state
-InteractionRequest defines client intent
-InteractionResult defines outcome
-PromptAction defines behavior
-PermissionCheck defines authority rule
-SessionState defines lifecycle mode
-```
-
-## For Vehicles
-
-Apply typed Luau to:
-
-- vehicle config
-- occupant state
-- input command records
-- suspension config
-- suspension strategy contracts
-- replication snapshot types
-- authority handoff messages
-- correction result types
-- debug telemetry records
-
-Policy:
-
-Vehicle systems should not pass untyped blobs between physics, input, networking, and presentation.
-
-## The Indefinite Framework
-
-Your long-term Roblox framework should include:
-
-```text
-Types
-Ids
-Result
-Registry<T>
-Readonly<T>
-ServiceContract
-NetworkSchema<T>
-ConfigSchema<T>
-ComponentSchema<T>
-OperationState
-SchedulerPhase
-SerializableSnapshot
-```
-
-Each piece has a permanent role:
-
-- `Types` centralizes shared primitives without becoming a dumping ground.
-- `Ids` defines branded identity types.
-- `Result` standardizes expected success/failure.
-- `Registry<T>` stores typed extension points.
-- `Readonly<T>` documents inspect-only views.
-- `ServiceContract` defines public APIs.
-- `NetworkSchema<T>` pairs message type and validator.
-- `ConfigSchema<T>` pairs config type and admission check.
-- `ComponentSchema<T>` pairs ECS component type and runtime guard.
-- `OperationState` models async lifecycle.
-- `SchedulerPhase` constrains execution phases.
-- `SerializableSnapshot` prevents behavior from entering snapshots.
-
-## How To Master It
-
-Practice in this order:
-
-1. Convert one utility module to `--!strict`.
-2. Export a public type from a service.
-3. Type a component.
-4. Type a config.
-5. Type a network message.
-6. Add a runtime validator matching that network type.
-7. Define branded ids.
-8. Replace string failure returns with a `Result` type.
-9. Replace mode booleans with a discriminated union.
-10. Build a generic registry.
-11. Type a prompt action contract.
-12. Type a weapon fire mode contract.
-13. Type a scheduler operation state.
-14. Refactor one manager into typed service/config/message/result boundaries.
-15. Use type errors as the guide until the architecture compiles cleanly.
-
-The best first real project is a typed prompt action registry. Then apply the same model to weapon fire modes, network schemas, vehicle strategies, ECS component registries, and rollback input records.
-
-## Permanent Policy
-
-Use this rule for every future Roblox system:
-
-> If a concept matters to architecture, authority, networking, persistence, scheduling, or extension, give it a type.
-
-The true mastery is combining the first five stages:
-
-- ECS defines authoritative data.
-- OOP defines ownership and polymorphic behavior.
-- Scheduling defines when work happens.
-- Runtime contracts protect boundaries.
-- Static types make those boundaries visible before runtime.
-
-When these five agree, your systems become easier to extend, safer to refactor, harder to exploit, and much closer to framework-grade Roblox engineering.
+- [Introduction to Luau types](https://luau.org/types/)
+- [Luau primitive and singleton types](https://luau.org/types/basic-types/)
+- [Luau union and intersection types](https://luau.org/types/unions-and-intersections/)
+- [Luau object-oriented typing](https://luau.org/types/object-oriented-programs/)
+- [Luau type refinements](https://luau.org/types/type-refinements/)

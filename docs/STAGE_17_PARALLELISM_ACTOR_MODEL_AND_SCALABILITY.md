@@ -1,104 +1,97 @@
-# Stage 17: Parallelism, Actor Model, Bulk Movement, and Scalability
+# Stage 17: Parallel Luau and Scalability
 
-Large Roblox systems need scalable execution. Parallelism, batching, BulkMoveTo, query batching, and workload partitioning are powerful only when state ownership is clear.
+Parallel execution can reduce elapsed CPU time for suitable workloads. It also adds Actor/VM boundaries, safe-API restrictions, communication cost, and harder debugging. Profile first.
 
-Core policy:
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
 
-> Parallel work must not share mutable gameplay state casually. Use ownership boundaries, messages, snapshots, batches, and deterministic merge points.
+## Platform model
 
-## Computer Science Fundamentals
+- Scripts under different Actors can run in parallel.
+- Scripts in the same Actor execute sequentially relative to each other.
+- Code enters parallel execution with documented mechanisms such as `task.desynchronize()`, parallel signal connections, or parallel Actor message bindings.
+- Many Instance/API operations are not safe in parallel; current API thread-safety tags are authoritative.
+- `require()` cannot be called after entering a desynchronized parallel phase; load required modules in serial first.
+- Each Actor runs its own Luau VM, and ModuleScript state is not shared/cached across Actors like ordinary same-VM requires.
+- Actor messages are asynchronous. SharedTables support shared data with specific semantics; individual safe operations do not make an arbitrary multi-step algorithm atomic.
 
-- Actor model: isolated workers communicate through messages.
-- Data parallelism: the same operation runs across many independent inputs.
-- Task batching: combine many small operations into one larger operation.
-- Immutability: workers consume snapshots instead of live mutable state.
-- Synchronization: results merge at explicit safe points.
-- Amdahl's law: parallelism only helps the portion that can actually run in parallel.
-- Spatial partitioning: divide large worlds by region/cell/interest.
+Recheck current documentation because supported APIs and features evolve.
 
-## Roblox API Grounding
+## Suitable work
 
-- Actors are containers that can run scripts in parallel when paired with `task.desynchronize()`.
-- Actor messaging supports asynchronous communication between actors.
-- ModuleScripts required by Actors are not shared/cached with the main thread in the same way; design shared state accordingly.
-- `WorldRoot:BulkMoveTo(partList, cframeList, eventMode)` moves many parts in one call and is useful for batched visual/presentation movement.
-- PathfindingService should be queued and budgeted; `CreatePath()` plus path computation should not be spammed per NPC per frame.
-- RunService phases should be wrapped by scheduler utilities instead of scattered frame callbacks.
+Candidates often include large independent batches of:
 
-## Performance Impact
+- raycasts or perception calculations using parallel-safe APIs;
+- procedural generation computations;
+- pure scoring/math;
+- data transforms over partitioned input.
 
-- BulkMoveTo can reduce overhead when many anchored or presentation parts need coordinated movement.
-- Bulk movement is not a replacement for server-authoritative simulation; it is a batch application mechanism.
-- Parallel workers have serialization/message costs; do not parallelize tiny tasks.
-- Pathfinding overload can dominate server time; queue, cache, throttle, and prioritize.
-- Immutable snapshots reduce race risk but cost memory; store only needed fields.
-- Merge phases should validate worker outputs before mutating authoritative state.
+Poor candidates include tiny jobs, highly shared mutable state, frequent serial Instance mutation, or workloads dominated by network/cloud yielding.
 
-## Mastery Topics
+## Partitioning
 
-1. Roblox Actor boundaries.
-2. Parallel Luau constraints.
-3. Message-passing architecture.
-4. Immutable snapshot inputs.
-5. Worker-safe computation.
-6. Deterministic merge phases.
-7. AI/pathfinding workload partitioning.
-8. Combat query batching.
-9. Serialization cost awareness.
-10. Parallel debug and profiling tools.
-11. BulkMoveTo visual batching.
-12. Spatial partitioning and cell ownership.
-13. Interest-set computation off the hot path.
-14. Worker result validation.
-15. Budgeted pathfinding queues.
+Partition by meaningful independent work. Too few Actors may underuse cores; too many can increase scheduling, memory, and maintenance cost. The best count depends on workload and devices, not simply CPU core count.
 
-## Extreme Usage Cases
+Do not require ECS for Parallel Luau. Arrays, jobs, service-owned batches, or ECS queries can all provide work units.
 
-- Batch NPC perception queries across workers.
-- Precompute visibility candidates from immutable snapshots.
-- Use BulkMoveTo to move hundreds of client-side/presentation parts in one batched call.
-- Partition large NPC worlds by region.
-- Run procedural placement scoring in worker-safe batches.
-- Batch raycast candidate generation, then validate authoritative hits in serial.
+## Communication and merge
 
-## BulkMoveTo Policy
+A serial merge phase is one useful design when workers compute proposals and one owner commits authoritative state. It is not mandatory for every parallel feature; Actor-local ownership or safe isolated updates may fit better.
 
-Use BulkMoveTo for batched movement where the engine boundary cost matters:
+Whichever model is chosen, define:
 
-- minimap markers
-- client-only projectile/tracer visuals
-- debug ghosts
-- large groups of anchored props
-- procedural preview pieces
-- NPC presentation rigs where simulation state is elsewhere
+- input snapshot/ownership;
+- message/shareability constraints;
+- stale result rejection;
+- failure/timeout behavior;
+- output validation;
+- authoritative mutation point.
 
-Do not use BulkMoveTo to bypass authoritative movement, collision, damage, ownership, or validation rules.
+## SharedTables
 
-## Practice Project
+SharedTables can avoid copies for shared state but introduce shared-memory reasoning. Define who writes each key, whether compound updates need another coordination protocol, and how snapshots/readers observe change. Do not treat them as ordinary tables with free cross-thread mutation.
 
-Build an NPC perception batcher:
+## Bulk and batched engine work
 
-```text
-Server ECS snapshot
-  -> partition targets by region
-  -> worker computes visible candidates
-  -> serial merge validates results
-  -> AI blackboards update
-  -> client presentation uses BulkMoveTo for debug markers
-```
+Batching can help even without parallelism. APIs such as `Workspace:BulkMoveTo()` may reduce overhead for moving many Parts in supported cases, but API behavior, event semantics, and physics requirements must be checked. It is not a replacement for ownership/security validation or a universal way to move characters.
 
-Acceptance standard:
+## Amdahl’s law and measurement
 
-The authoritative state mutates only during the merge phase, and debug/performance reports show batch size, worker time, merge time, and rejected outputs.
+Total speedup is limited by serial work plus scheduling/synchronization overhead. Measure:
 
-## Permanent Rule
+- serial baseline;
+- worker computation;
+- message/copy/share cost;
+- synchronization/merge;
+- memory per Actor/VM;
+- worst frame/server-step time on target devices.
 
-Parallelism is for isolated computation, not escaping architecture.
+Parallel code that moves work off one timeline can still exceed total frame budgets.
 
-## References
+## Practice project
 
-- Roblox Creator Hub: Actor.
-- Roblox Creator Hub: Parallel Luau.
-- Roblox Creator Hub: task.desynchronize/task.synchronize.
-- Roblox Creator Hub: WorldRoot and BulkMoveTo.
-- Roblox Creator Hub: PathfindingService and Pathfinding.
+Create a representative raycast/scoring batch with:
+
+1. serial implementation;
+2. batched serial implementation;
+3. Actor-parallel implementation.
+
+Test multiple batch and Actor counts, stale cancellation, one worker failure, and serial commit cost. Keep parallelism only if end-to-end measurements improve without violating semantics.
+
+## Completion evidence
+
+You understand this stage when you can:
+
+- state Actor VM/module isolation accurately;
+- use current thread-safety tags;
+- explain where `require()` is allowed;
+- choose message, snapshot, SharedTable, or Actor-local ownership intentionally;
+- include communication/merge/memory in speedup claims;
+- reject parallelism for workloads where it loses.
+
+## Primary references
+
+- [Roblox Parallel Luau](https://create.roblox.com/docs/scripting/multithreading)
+- [Actor API](https://create.roblox.com/docs/reference/engine/classes/Actor)
+- [SharedTable API](https://create.roblox.com/docs/reference/engine/datatypes/SharedTable)
+- [Workspace BulkMoveTo API](https://create.roblox.com/docs/reference/engine/classes/WorldRoot#BulkMoveTo)
+- [Roblox performance optimization](https://create.roblox.com/docs/performance-optimization)
