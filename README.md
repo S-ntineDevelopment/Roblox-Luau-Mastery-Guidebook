@@ -1,54 +1,52 @@
 # Roblox Luau Engineering Guidebook
 
-A fact-checked Roblox/Luau curriculum ordered from basic language structures to advanced production architecture.
+A fact-checked Roblox/Luau curriculum arranged from the smallest local language concepts at Stage 1 to project-wide release operations at Stage 22.
 
-This repository intentionally contains learning material only. It excludes project agent instructions, private project policy, engine implementation documents, and operational checklists.
+This repository contains learning material only. Patterns are tools, not maturity requirements.
 
 ## Start here
 
 1. [Bare Minimum Prerequisites](docs/prerequisites/BARE_MINIMUM.md)
 2. [Accuracy and Applicability Standard](docs/CURRICULUM_ACCURACY_STANDARD.md)
-3. [Master Curriculum and Practice Path](docs/ROBLOX_LUAU_MASTERY_CURRICULUM.md)
-4. [Type-Checked Beginner Lessons](docs/lessons/README.md)
+3. [Stage Coverage and Difficulty Map](docs/STAGE_COVERAGE_AND_DIFFICULTY_MAP.md)
+4. [Master Curriculum](docs/ROBLOX_LUAU_MASTERY_CURRICULUM.md)
+5. [Type-Checked Lesson Index](docs/lessons/README.md)
 
-## Tier 1 — Luau foundations
+## Difficulty-ordered stages
 
-1. [Tables, ModuleScripts, Metatables, and Data Structures](docs/STAGE_01_LUAU_TABLES_MODULES_METATABLES_DATA_STRUCTURES.md)
-2. [Typed Luau and Static Contracts](docs/STAGE_02_TYPED_LUAU_STATIC_CONTRACTS.md)
-3. [Objects, Composition, and Polymorphic Dispatch](docs/STAGE_03_OOP_COMPOSITION_POLYMORPHIC_DISPATCH.md)
-4. [Coroutines, Scheduling, and Async Control Flow](docs/STAGE_04_COROUTINES_SCHEDULING_ASYNC_CONTROL_FLOW.md)
+| Stage | Level | Focus |
+| ---: | --- | --- |
+| [1. Tables, Records, and Mutation](docs/STAGE_01_TABLES_RECORDS_MUTATION.md) | Beginner | arrays, dictionaries, records, references, and mutation |
+| [2. Functions, ModuleScripts, and State Ownership](docs/STAGE_02_FUNCTIONS_MODULES_STATE_OWNERSHIP.md) | Beginner | functions, module APIs, caching, and explicit state owners |
+| [3. Common Data Structures and State Machines](docs/STAGE_03_COMMON_DATA_STRUCTURES.md) | Beginner | sets, stacks, queues, registries, and legal transitions |
+| [4. Typed Luau and Static Contracts](docs/STAGE_04_TYPED_LUAU_STATIC_CONTRACTS.md) | Foundation | strict mode, annotations, unions, narrowing, and checker limits |
+| [5. Metatables and Object Methods](docs/STAGE_05_METATABLES_OBJECT_METHODS.md) | Foundation | method lookup, constructors, self, and metamethod limits |
+| [6. Composition, Polymorphic Dispatch, and Dependency Injection](docs/STAGE_06_COMPOSITION_POLYMORPHIC_DISPATCH_DEPENDENCY_INJECTION.md) | Foundation | composed capabilities, replaceable behavior, and supplied dependencies |
+| [7. Runtime Validation, Proxies, and Contracts](docs/STAGE_07_RUNTIME_VALIDATION_PROXIES_CONTRACTS.md) | Applied | dynamic admission, write guards, capabilities, and serialization |
+| [8. Async Ownership, Lifecycle, and Scheduling](docs/STAGE_08_ASYNC_LIFECYCLE_SCHEDULING.md) | Applied | cancellation, task ownership, timing policies, and cleanup |
+| [9. Utilities, Adapters, and Engine Foundations](docs/STAGE_09_UTILITY_ARCHITECTURE_ENGINE_FOUNDATIONS.md) | Applied | small reusable semantics, wrappers, caches, and test seams |
+| [10. Contract-First Feature Architecture](docs/STAGE_10_CONTRACT_FIRST_FEATURE_ARCHITECTURE.md) | Intermediate | feature identity, behavior contracts, registries, and shared rules |
+| [11. Testing, Tooling, and Observability](docs/STAGE_11_TESTING_TOOLING_OBSERVABILITY.md) | Intermediate | tests, bounded diagnostics, profiling, fuzzing, and failure evidence |
+| [12. Networking, Replication, and Security](docs/STAGE_12_NETWORKING_REPLICATION_SECURITY.md) | Intermediate | remote protocols, runtime admission, authority, and replication |
+| [13. Persistence, Economy, and Transaction Integrity](docs/STAGE_13_PERSISTENCE_ECONOMY_TRANSACTION_INTEGRITY.md) | Advanced | schema versions, idempotency, budgets, receipts, and recovery |
+| [14. ECS and Data-Oriented Architecture](docs/STAGE_14_ECS_DATA_ORIENTED_ARCHITECTURE.md) | Advanced | entity identity, component stores, systems, queries, and staged mutation |
+| [15. Rules Engines and Declarative Gameplay](docs/STAGE_15_RULES_ENGINES_DECLARATIVE_GAMEPLAY.md) | Advanced | conditions, effects, ordering, validation, and explainable evaluation |
+| [16. Deterministic Simulation, Time, and Replay](docs/STAGE_16_DETERMINISTIC_SIMULATION_TEMPORAL_ARCHITECTURE.md) | Advanced | fixed steps, clocks, snapshots, controlled randomness, and replay limits |
+| [17. AI Behavior and NPC Systems](docs/STAGE_17_AI_BEHAVIOR_NPC_SYSTEMS.md) | Expert | perception, decisions, actions, movement ownership, and debugging |
+| [18. Prediction, Reconciliation, Lag Compensation, and Rollback](docs/STAGE_18_PREDICTION_RECONCILIATION_ROLLBACK.md) | Expert | client prediction, server correction, history, replay, and fairness |
+| [19. Domain Platforms and Large-Scale Architecture](docs/STAGE_19_DOMAIN_PLATFORMS_LARGE_SCALE_ARCHITECTURE.md) | Expert | shared domain rules, extension points, compatibility, and ownership |
+| [20. Source Generation, Templates, and Static Analysis](docs/STAGE_20_SOURCE_GENERATION_TEMPLATES_STATIC_ANALYSIS.md) | Production | validated descriptors, deterministic output, audits, and generated ownership |
+| [21. Parallel Luau, Actors, and Scalability](docs/STAGE_21_PARALLEL_LUAU_ACTORS_SCALABILITY.md) | Production | partitioning, Actors, thread safety, communication, and merge phases |
+| [22. Release Engineering, Versioning, and LiveOps](docs/STAGE_22_RELEASE_ENGINEERING_VERSIONING_LIVEOPS.md) | Production | migrations, flags, rollout, rollback, compatibility, and operations |
 
-## Tier 2 — Reliable feature systems
+## Specialty paths
 
-5. [Utilities and Engine Foundations](docs/STAGE_05_UTILITY_ARCHITECTURE_ENGINE_FOUNDATION.md)
-6. [Contract-First Feature Design](docs/STAGE_06_CONTRACT_FIRST_FEATURE_ARCHITECTURE.md)
-7. [Runtime Tooling, Testing, and Observability](docs/STAGE_07_RUNTIME_SYSTEMS_TOOLING_OBSERVABILITY.md)
-8. [Networking, Replication, and Security](docs/STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md)
-9. [Persistence and Economy Integrity](docs/STAGE_09_PERSISTENCE_ECONOMY_TRANSACTION_INTEGRITY.md)
+- [Networking Mastery Ladder](docs/NETWORKING_MASTERY_LADDER.md) — continue after Stage 12.
+- [Combat Security, Aim Automation, and ESP Limits](docs/SPECIALTY_GUNKIT_ANTI_CHEAT_AIMLOCK_AIMBOT_ESP_PREVENTION.md) — begin after Stage 12; Stage 18 is recommended for lag compensation.
+- [Engineering Evidence Rubric](docs/SCRIPTER_RANKING_RUBRIC.md) — assess demonstrated engineering evidence rather than technology count.
 
-## Tier 3 — Advanced gameplay architecture
+## Verification
 
-10. [ECS and Data-Oriented Design](docs/STAGE_10_ECS_DATA_ORIENTED_ARCHITECTURE.md)
-11. [Rules Engines and Declarative Gameplay](docs/STAGE_11_RULES_ENGINES_DECLARATIVE_GAMEPLAY.md)
-12. [Simulation Time, History, and Replay](docs/STAGE_12_DETERMINISTIC_SIMULATION_TEMPORAL_ARCHITECTURE.md)
-13. [Prediction, Reconciliation, Lag Compensation, and Rollback](docs/STAGE_13_ROLLBACK_NETCODE_PREDICTION_RECONCILIATION.md)
-14. [AI and NPC Systems](docs/STAGE_14_AI_BEHAVIOR_NPC_SYSTEMS.md)
-15. [Scaling Architecture and Domain Platforms](docs/STAGE_15_LARGE_SCALE_GAME_ARCHITECTURE_DOMAIN_PLATFORMS.md)
+Every numbered stage shows a complete `--!strict` program before its reference material. The verification tools enforce contiguous stages `1..22`, exact code-block/source equality, static analysis, and runtime assertions.
 
-## Tier 4 — Production mastery
-
-16. [Templates, Code Generation, and Static Analysis](docs/STAGE_16_SOURCE_GENERATION_TEMPLATES_AND_STATIC_ANALYSIS.md)
-17. [Parallel Luau and Scalability](docs/STAGE_17_PARALLELISM_ACTOR_MODEL_AND_SCALABILITY.md)
-18. [Release Engineering and LiveOps](docs/STAGE_18_RELEASE_ENGINEERING_VERSIONING_AND_LIVEOPS.md)
-
-## Specialty and extended paths
-
-- [Networking Mastery Ladder](docs/NETWORKING_MASTERY_LADDER.md) — continue after Stage 8.
-- [Combat Security, Aim Automation, and ESP Limits](docs/SPECIALTY_GUNKIT_ANTI_CHEAT_AIMLOCK_AIMBOT_ESP_PREVENTION.md) — begin after Stage 8; Stages 12-13 are recommended for lag compensation.
-- [Engineering Evidence Rubric](docs/SCRIPTER_RANKING_RUBRIC.md) — assess demonstrated engineering evidence, not technology count.
-
-## Scope
-
-The guidebook treats patterns as options, not maturity requirements. It distinguishes platform facts, security requirements, engineering heuristics, project policy, and claims that need profiling or runtime proof. Each stage includes primary references, suggested prerequisites, a three-step beginner lesson, practice work, and completion evidence.
-
-Every stage page shows its complete working lesson before the optional theory. The 20 standalone lesson programs use `--!strict` and assertions, and the verification script checks that the visible Markdown code exactly matches the analyzed source. Use the included scripts under `tools/` to repeat the type and runtime checks with a current Luau release.
+Static and standalone runtime checks do not prove Roblox Studio lifecycle, live-provider, network-condition, security, visual, performance, or scale behavior.

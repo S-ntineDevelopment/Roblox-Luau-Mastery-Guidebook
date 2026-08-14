@@ -2,7 +2,7 @@
 
 Networking mastery is the ability to choose the smallest correct communication model, validate hostile input, and prove behavior under real latency/scale. It is not measured by how many custom codecs, buffers, remotes, or rollback systems a project contains.
 
-Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) and [Stage 8](STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md) first.
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) and [Stage 12](STAGE_12_NETWORKING_REPLICATION_SECURITY.md) first.
 
 ## Guided lesson: sequence and rate admission
 
@@ -213,7 +213,7 @@ Practice: deliberately drop/reorder an unreliable delta and demonstrate recovery
 
 ## Level 9: Latency presentation
 
-Choose separately among interpolation, extrapolation, prediction, reconciliation, lag compensation, and rollback. See [Stage 13](STAGE_13_ROLLBACK_NETCODE_PREDICTION_RECONCILIATION.md).
+Choose separately among interpolation, extrapolation, prediction, reconciliation, lag compensation, and rollback. See [Stage 18](STAGE_18_PREDICTION_RECONCILIATION_ROLLBACK.md).
 
 ECS is not a prerequisite. Plain records, services, or objects can provide snapshot state. Fixed ticks are not a determinism guarantee.
 

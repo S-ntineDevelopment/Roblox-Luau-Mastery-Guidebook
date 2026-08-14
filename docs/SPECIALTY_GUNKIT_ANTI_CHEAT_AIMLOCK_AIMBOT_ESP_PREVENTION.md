@@ -2,7 +2,7 @@
 
 Combat security protects authoritative outcomes and limits unnecessary information. It cannot make a hostile client trustworthy, prevent decompilation of replicated code, or make already replicated enemy information invisible to an exploiter.
 
-Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md), [Stage 8](STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md), and the [Networking Ladder](NETWORKING_MASTERY_LADDER.md) first.
+Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md), [Stage 12](STAGE_12_NETWORKING_REPLICATION_SECURITY.md), and the [Networking Ladder](NETWORKING_MASTERY_LADDER.md) first. Stage 18 is recommended for lag compensation and reconciliation.
 
 ## Guided lesson: validate one fire intent
 

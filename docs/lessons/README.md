@@ -1,56 +1,51 @@
 # Type-Checked Curriculum Lessons
 
-Every lesson is a small, standalone Luau program, and the exact program is embedded directly in its curriculum page. The files use `--!strict`, avoid hidden framework dependencies, and progress through three ideas:
+The directory contains one standalone program for every numbered stage plus networking and combat specialties. Each exact program is embedded in its curriculum page.
 
-1. define the smallest useful data or contract;
-2. perform one real operation;
-3. check the expected result with `assert()`.
+**Verification snapshot:** all 22 numbered stages were present and all 24 programs passed `luau-analyze` and the Luau CLI runtime from the official Luau `0.733` Windows release on 2026-08-14.
 
-**Verification snapshot:** all 20 lessons passed `luau-analyze` and the Luau CLI runtime from the official Luau `0.733` Windows release on 2026-08-14. Re-run the checks when the compiler version changes.
+Every program uses `--!strict`, demonstrates one small behavior, marks three steps, checks results with `assert()`, and avoids framework or Roblox-global dependencies.
 
-The examples model Roblox use cases without requiring Roblox globals, so the official Luau command-line analyzer can check them. The verification script also proves that each visible Markdown code block is identical to its checked `.luau` source. Engine-specific behavior still needs Studio/runtime verification.
-
-Run every lesson with:
+## Run all checks
 
 ```powershell
 .\tools\verify_curriculum_lessons.ps1 -LuauAnalyzePath C:\path\to\luau-analyze.exe
 ```
 
-Run every lesson's assertions with:
-
 ```powershell
 .\tools\run_curriculum_lessons.ps1 -LuauPath C:\path\to\luau.exe
 ```
 
-Run one lesson with:
+## Numbered lesson index
 
-```powershell
-luau-analyze docs\lessons\STAGE_01_TABLES_AND_METATABLES.luau
-```
+| Stage | Program | Tiny use case |
+| ---: | --- | --- |
+| 1 | [STAGE_01_TABLES_RECORDS.luau](STAGE_01_TABLES_RECORDS.luau) | arrays, dictionaries, records, references, and mutation |
+| 2 | [STAGE_02_FUNCTIONS_MODULES.luau](STAGE_02_FUNCTIONS_MODULES.luau) | functions, module APIs, caching, and explicit state owners |
+| 3 | [STAGE_03_DATA_STRUCTURES.luau](STAGE_03_DATA_STRUCTURES.luau) | sets, stacks, queues, registries, and legal transitions |
+| 4 | [STAGE_04_TYPED_LUAU.luau](STAGE_04_TYPED_LUAU.luau) | strict mode, annotations, unions, narrowing, and checker limits |
+| 5 | [STAGE_05_METATABLE_COUNTER.luau](STAGE_05_METATABLE_COUNTER.luau) | method lookup, constructors, self, and metamethod limits |
+| 6 | [STAGE_06_COMPOSITION.luau](STAGE_06_COMPOSITION.luau) | composed capabilities, replaceable behavior, and supplied dependencies |
+| 7 | [STAGE_07_RUNTIME_PROXY_CONTRACT.luau](STAGE_07_RUNTIME_PROXY_CONTRACT.luau) | dynamic admission, write guards, capabilities, and serialization |
+| 8 | [STAGE_08_ASYNC_OWNERSHIP.luau](STAGE_08_ASYNC_OWNERSHIP.luau) | cancellation, task ownership, timing policies, and cleanup |
+| 9 | [STAGE_09_SMALL_UTILITY.luau](STAGE_09_SMALL_UTILITY.luau) | small reusable semantics, wrappers, caches, and test seams |
+| 10 | [STAGE_10_ACTION_CONTRACT.luau](STAGE_10_ACTION_CONTRACT.luau) | feature identity, behavior contracts, registries, and shared rules |
+| 11 | [STAGE_11_DIAGNOSTICS.luau](STAGE_11_DIAGNOSTICS.luau) | tests, bounded diagnostics, profiling, fuzzing, and failure evidence |
+| 12 | [STAGE_12_NETWORK_VALIDATION.luau](STAGE_12_NETWORK_VALIDATION.luau) | remote protocols, runtime admission, authority, and replication |
+| 13 | [STAGE_13_IDEMPOTENT_REWARD.luau](STAGE_13_IDEMPOTENT_REWARD.luau) | schema versions, idempotency, budgets, receipts, and recovery |
+| 14 | [STAGE_14_TINY_ECS.luau](STAGE_14_TINY_ECS.luau) | entity identity, component stores, systems, queries, and staged mutation |
+| 15 | [STAGE_15_SMALL_RULES.luau](STAGE_15_SMALL_RULES.luau) | conditions, effects, ordering, validation, and explainable evaluation |
+| 16 | [STAGE_16_FIXED_STEP.luau](STAGE_16_FIXED_STEP.luau) | fixed steps, clocks, snapshots, controlled randomness, and replay limits |
+| 17 | [STAGE_17_NPC_DECISION.luau](STAGE_17_NPC_DECISION.luau) | perception, decisions, actions, movement ownership, and debugging |
+| 18 | [STAGE_18_RECONCILIATION.luau](STAGE_18_RECONCILIATION.luau) | client prediction, server correction, history, replay, and fairness |
+| 19 | [STAGE_19_DOMAIN_PLATFORM.luau](STAGE_19_DOMAIN_PLATFORM.luau) | shared domain rules, extension points, compatibility, and ownership |
+| 20 | [STAGE_20_GENERATION.luau](STAGE_20_GENERATION.luau) | validated descriptors, deterministic output, audits, and generated ownership |
+| 21 | [STAGE_21_PARTITION_AND_MERGE.luau](STAGE_21_PARTITION_AND_MERGE.luau) | partitioning, Actors, thread safety, communication, and merge phases |
+| 22 | [STAGE_22_MIGRATION_AND_FLAG.luau](STAGE_22_MIGRATION_AND_FLAG.luau) | migrations, flags, rollout, rollback, compatibility, and operations |
 
-No diagnostic output and exit code `0` means the analyzer accepted the file. That proves parsing and static type consistency only; it does not prove Roblox API behavior, networking, persistence, performance, or lifecycle behavior in Studio.
+## Specialty lessons
 
-## Lesson index
+- [NETWORKING_LADDER_ADMISSION.luau](NETWORKING_LADDER_ADMISSION.luau)
+- [COMBAT_SERVER_VALIDATION.luau](COMBAT_SERVER_VALIDATION.luau)
 
-| Lesson | Tiny use case |
-| --- | --- |
-| Stage 1 | Track players, queue messages, and create a counter |
-| Stage 2 | Type and validate a coin reward |
-| Stage 3 | Compose a weapon from ammo and sound functions |
-| Stage 4 | Cancel a countdown before stale work runs |
-| Stage 5 | Reuse one small clamp utility |
-| Stage 6 | Register and run a small set of actions |
-| Stage 7 | Record a bounded diagnostic history |
-| Stage 8 | Admit an untrusted fire request |
-| Stage 9 | Apply an idempotent coin reward |
-| Stage 10 | Update health records with a tiny ECS-style system |
-| Stage 11 | Evaluate a small declarative reward rule |
-| Stage 12 | Step and snapshot a simple simulation |
-| Stage 13 | Correct prediction and replay unacknowledged input |
-| Stage 14 | Select one NPC action by score |
-| Stage 15 | Share one prompt rule across two features |
-| Stage 16 | Validate a descriptor before generating source text |
-| Stage 17 | Partition pure work and merge results |
-| Stage 18 | Migrate a saved record and evaluate a feature flag |
-| Networking | Check direction, sequence, and rate admission |
-| Combat security | Validate cadence, ammo, and range on the server |
+No analyzer diagnostics prove parsing and static type consistency for that exact compiler. Passing assertions prove only the modeled standalone behavior.
