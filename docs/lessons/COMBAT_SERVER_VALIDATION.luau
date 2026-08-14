@@ -30,7 +30,10 @@ local function validateFire(state: WeaponState, intent: FireIntent, serverTime: 
 	if serverTime - state.lastShotTime < state.secondsPerShot then
 		return { accepted = false, reason = "too fast" }
 	end
-	if intent.targetDistance < 0 or intent.targetDistance > state.maximumRange then
+	if not math.isfinite(intent.targetDistance)
+		or intent.targetDistance < 0
+		or intent.targetDistance > state.maximumRange
+	then
 		return { accepted = false, reason = "out of range" }
 	end
 

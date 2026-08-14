@@ -7,7 +7,75 @@
 
 **Use case:** Convert a V1 save to V2 and enable a feature for one test user.
 
-**Complete code:** [STAGE_18_MIGRATION_AND_FLAG.luau](lessons/STAGE_18_MIGRATION_AND_FLAG.luau)
+**Downloadable code:** [STAGE_18_MIGRATION_AND_FLAG.luau](lessons/STAGE_18_MIGRATION_AND_FLAG.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_18_MIGRATION_AND_FLAG.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_18_MIGRATION_AND_FLAG.luau -->
+```luau
+--!strict
+
+-- Use case: migrate an old save and enable a feature for a controlled group.
+
+type SaveV1 = { version: "V1", coins: number }
+type SaveV2 = { version: "V2", coins: number, level: number }
+
+-- Step 1: migration returns a new current-version record.
+local function migrate(save: SaveV1 | SaveV2): SaveV2
+	if save.version == "V2" then
+		return {
+			version = "V2",
+			coins = save.coins,
+			level = save.level,
+		}
+	end
+
+	return {
+		version = "V2",
+		coins = save.coins,
+		level = 1,
+	}
+end
+
+-- Step 2: a flag has an explicit default and allow-list override.
+type FeatureFlag = {
+	defaultEnabled: boolean,
+	enabledUserIds: { [number]: boolean },
+}
+
+local function isEnabled(flag: FeatureFlag, userId: number): boolean
+	if flag.enabledUserIds[userId] then
+		return true
+	end
+	return flag.defaultEnabled
+end
+
+-- Step 3: verify migration and rollout behavior.
+local current = migrate({ version = "V1", coins = 25 })
+assert(current.version == "V2" and current.level == 1)
+
+local flag: FeatureFlag = {
+	defaultEnabled = false,
+	enabledUserIds = { [101] = true },
+}
+assert(isEnabled(flag, 101))
+assert(not isEnabled(flag, 202))
+
+print("Stage 18 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_18_MIGRATION_AND_FLAG.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. `migrate()` accepts either supported version and always returns a copied V2 record.
 2. `FeatureFlag` declares a default plus an explicit user allow-list.

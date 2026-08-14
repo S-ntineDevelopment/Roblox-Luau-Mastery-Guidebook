@@ -7,7 +7,55 @@
 
 **Use case:** Regenerate every entity that currently has a health component.
 
-**Complete code:** [STAGE_10_TINY_ECS.luau](lessons/STAGE_10_TINY_ECS.luau)
+**Downloadable code:** [STAGE_10_TINY_ECS.luau](lessons/STAGE_10_TINY_ECS.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_10_TINY_ECS.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_10_TINY_ECS.luau -->
+```luau
+--!strict
+
+-- Use case: apply the same regeneration rule to entities with health data.
+
+type EntityId = number
+type Health = {
+	current: number,
+	maximum: number,
+}
+
+-- Step 1: store one component type by entity ID.
+local healthByEntity: { [EntityId]: Health } = {
+	[1] = { current = 5, maximum = 10 },
+	[2] = { current = 9, maximum = 10 },
+}
+
+-- Step 2: a system applies one operation to every matching record.
+local function regenerate(store: { [EntityId]: Health }, amount: number)
+	for _, health in store do
+		health.current = math.min(health.maximum, health.current + amount)
+	end
+end
+
+-- Step 3: run the system and check both entities.
+regenerate(healthByEntity, 3)
+assert(healthByEntity[1].current == 8)
+assert(healthByEntity[2].current == 10)
+
+print("Stage 10 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_10_TINY_ECS.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. `healthByEntity` maps entity IDs to plain health records.
 2. `regenerate()` is a system-like function that processes every matching record.

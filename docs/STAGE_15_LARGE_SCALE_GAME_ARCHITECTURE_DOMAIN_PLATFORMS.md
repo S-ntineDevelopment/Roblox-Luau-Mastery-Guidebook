@@ -7,7 +7,80 @@
 
 **Use case:** A shop prompt and bell prompt share distance admission but retain different behavior.
 
-**Complete code:** [STAGE_15_DOMAIN_PLATFORM.luau](lessons/STAGE_15_DOMAIN_PLATFORM.luau)
+**Downloadable code:** [STAGE_15_DOMAIN_PLATFORM.luau](lessons/STAGE_15_DOMAIN_PLATFORM.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_15_DOMAIN_PLATFORM.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_15_DOMAIN_PLATFORM.luau -->
+```luau
+--!strict
+
+-- Use case: two prompts share the same distance rule but keep their own behavior.
+
+type PromptDefinition = {
+	maximumDistance: number,
+	run: (playerName: string) -> string,
+}
+
+type PromptPlatform = {
+	definitions: { [string]: PromptDefinition },
+}
+
+-- Step 1: the platform owns the shared admission rule.
+local function tryRun(
+	platform: PromptPlatform,
+	id: string,
+	playerName: string,
+	distance: number
+): string?
+	local definition = platform.definitions[id]
+	if definition == nil
+		or not math.isfinite(distance)
+		or distance < 0
+		or distance > definition.maximumDistance
+	then
+		return nil
+	end
+	return definition.run(playerName)
+end
+
+-- Step 2: features provide identity, data, and domain behavior.
+local platform: PromptPlatform = {
+	definitions = {
+		OpenShop = {
+			maximumDistance = 10,
+			run = function(playerName: string): string
+				return `{playerName} opened the shop`
+			end,
+		},
+		RingBell = {
+			maximumDistance = 6,
+			run = function(playerName: string): string
+				return `{playerName} rang the bell`
+			end,
+		},
+	},
+}
+
+-- Step 3: both features pass through the same distance check.
+assert(tryRun(platform, "OpenShop", "Ari", 4) == "Ari opened the shop")
+assert(tryRun(platform, "RingBell", "Ari", 9) == nil)
+
+print("Stage 15 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_15_DOMAIN_PLATFORM.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. `PromptDefinition` contains feature distance and behavior.
 2. `tryRun()` owns the genuinely shared lookup and distance rule.

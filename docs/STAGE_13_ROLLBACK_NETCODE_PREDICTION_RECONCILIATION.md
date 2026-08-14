@@ -7,7 +7,75 @@
 
 **Use case:** A client predicts two movements, then receives server truth acknowledging only the first.
 
-**Complete code:** [STAGE_13_RECONCILIATION.luau](lessons/STAGE_13_RECONCILIATION.luau)
+**Downloadable code:** [STAGE_13_RECONCILIATION.luau](lessons/STAGE_13_RECONCILIATION.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_13_RECONCILIATION.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_13_RECONCILIATION.luau -->
+```luau
+--!strict
+
+-- Use case: accept server position, then replay inputs the server has not acknowledged.
+
+type InputCommand = {
+	sequence: number,
+	delta: number,
+}
+
+type ClientState = {
+	position: number,
+	pending: { InputCommand },
+}
+
+local function apply(state: ClientState, command: InputCommand)
+	state.position += command.delta
+end
+
+-- Step 1: local input predicts immediately and enters pending history.
+local function predict(state: ClientState, command: InputCommand)
+	apply(state, command)
+	table.insert(state.pending, command)
+end
+
+-- Step 2: server acknowledgement becomes the new base truth.
+local function reconcile(state: ClientState, serverPosition: number, acknowledgedSequence: number)
+	state.position = serverPosition
+
+	local remaining: { InputCommand } = {}
+	for _, command in state.pending do
+		if command.sequence > acknowledgedSequence then
+			table.insert(remaining, command)
+			apply(state, command)
+		end
+	end
+	state.pending = remaining
+end
+
+-- Step 3: replay only commands newer than the acknowledgement.
+local state: ClientState = { position = 0, pending = {} }
+predict(state, { sequence = 1, delta = 2 })
+predict(state, { sequence = 2, delta = 2 })
+assert(state.position == 4)
+
+reconcile(state, 1.5, 1)
+assert(state.position == 3.5)
+assert(#state.pending == 1 and state.pending[1].sequence == 2)
+
+print("Stage 13 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_13_RECONCILIATION.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. `predict()` applies input immediately and records it by sequence.
 2. `reconcile()` replaces predicted position with admitted server position.

@@ -7,7 +7,63 @@
 
 **Use case:** A reward function must either return the new balance or explain why it rejected the amount.
 
-**Complete code:** [STAGE_02_TYPED_LUAU.luau](lessons/STAGE_02_TYPED_LUAU.luau)
+**Downloadable code:** [STAGE_02_TYPED_LUAU.luau](lessons/STAGE_02_TYPED_LUAU.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_02_TYPED_LUAU.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_02_TYPED_LUAU.luau -->
+```luau
+--!strict
+
+-- Use case: accept or reject a coin reward without an ambiguous nil result.
+
+-- Step 1: describe the record and the two possible outcomes.
+type PlayerData = {
+	coins: number,
+}
+
+type RewardResult =
+	{ ok: true, newBalance: number }
+	| { ok: false, reason: string }
+
+-- Step 2: make the function contract explicit.
+local function addCoins(data: PlayerData, amount: number): RewardResult
+	if amount <= 0 then
+		return { ok = false, reason = "amount must be positive" }
+	end
+
+	data.coins += amount
+	return { ok = true, newBalance = data.coins }
+end
+
+-- Step 3: narrow the tagged union before reading variant-specific fields.
+local data: PlayerData = { coins = 10 }
+local result = addCoins(data, 5)
+
+if result.ok then
+	assert(result.newBalance == 15)
+else
+	error(result.reason)
+end
+
+local rejected = addCoins(data, -1)
+assert(not rejected.ok)
+
+print("Stage 2 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_02_TYPED_LUAU.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read `PlayerData` to see the input record's exact shape.
 2. Read `RewardResult` as two tagged alternatives: `{ ok = true }` and `{ ok = false }`.

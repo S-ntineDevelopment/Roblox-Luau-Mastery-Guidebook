@@ -7,7 +7,63 @@
 
 **Use case:** A retried daily reward must not add coins twice.
 
-**Complete code:** [STAGE_09_IDEMPOTENT_REWARD.luau](lessons/STAGE_09_IDEMPOTENT_REWARD.luau)
+**Downloadable code:** [STAGE_09_IDEMPOTENT_REWARD.luau](lessons/STAGE_09_IDEMPOTENT_REWARD.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_09_IDEMPOTENT_REWARD.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_09_IDEMPOTENT_REWARD.luau -->
+```luau
+--!strict
+
+-- Use case: a retried reward request must not grant coins twice.
+
+type Profile = {
+	coins: number,
+	appliedTransactions: { [string]: boolean },
+}
+
+-- Step 1: require a stable transaction ID and a valid amount.
+local function grantCoins(profile: Profile, transactionId: string, amount: number): boolean
+	if transactionId == "" or amount <= 0 then
+		return false
+	end
+
+	-- Step 2: return success for a known retry without applying it again.
+	if profile.appliedTransactions[transactionId] then
+		return true
+	end
+
+	profile.coins += amount
+	profile.appliedTransactions[transactionId] = true
+	return true
+end
+
+-- Step 3: call the same transaction twice and inspect the state to be saved.
+local profile: Profile = {
+	coins = 10,
+	appliedTransactions = {},
+}
+
+assert(grantCoins(profile, "daily-2026-08-14", 5))
+assert(grantCoins(profile, "daily-2026-08-14", 5))
+assert(profile.coins == 15)
+assert(not grantCoins(profile, "", 5))
+
+print("Stage 9 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_09_IDEMPOTENT_REWARD.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read the profile's balance and applied-transaction set.
 2. `grantCoins()` rejects malformed input and returns early for a known retry.

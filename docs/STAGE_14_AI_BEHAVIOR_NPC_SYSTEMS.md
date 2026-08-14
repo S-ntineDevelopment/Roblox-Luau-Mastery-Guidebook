@@ -7,7 +7,73 @@
 
 **Use case:** An NPC chooses patrol, heal, or attack from current context.
 
-**Complete code:** [STAGE_14_NPC_DECISION.luau](lessons/STAGE_14_NPC_DECISION.luau)
+**Downloadable code:** [STAGE_14_NPC_DECISION.luau](lessons/STAGE_14_NPC_DECISION.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_14_NPC_DECISION.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_14_NPC_DECISION.luau -->
+```luau
+--!strict
+
+-- Use case: choose whether an NPC should patrol, heal, or attack.
+
+type Context = {
+	healthRatio: number,
+	canSeeTarget: boolean,
+}
+
+type Action = {
+	name: string,
+	score: (Context) -> number,
+}
+
+-- Step 1: each action owns one small scoring rule.
+local actions: { Action } = {
+	{ name = "Patrol", score = function(): number return 1 end },
+	{ name = "Heal", score = function(context: Context): number
+		return if context.healthRatio < 0.3 then 10 else 0
+	end },
+	{ name = "Attack", score = function(context: Context): number
+		return if context.canSeeTarget then 5 else 0
+	end },
+}
+
+-- Step 2: selection compares scores; execution remains a separate concern.
+local function chooseAction(context: Context): Action
+	local best = actions[1]
+	local bestScore = best.score(context)
+
+	for index = 2, #actions do
+		local candidate = actions[index]
+		local candidateScore = candidate.score(context)
+		if candidateScore > bestScore then
+			best = candidate
+			bestScore = candidateScore
+		end
+	end
+
+	return best
+end
+
+-- Step 3: test two easy-to-explain decisions.
+assert(chooseAction({ healthRatio = 0.2, canSeeTarget = true }).name == "Heal")
+assert(chooseAction({ healthRatio = 1, canSeeTarget = true }).name == "Attack")
+
+print("Stage 14 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_14_NPC_DECISION.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Each `Action` has a name and one scoring function.
 2. `chooseAction()` compares scores without executing any action.

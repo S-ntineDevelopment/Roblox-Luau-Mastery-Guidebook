@@ -7,7 +7,57 @@
 
 **Use case:** Health and quest progress both need a value clamped from `0` to `1`.
 
-**Complete code:** [STAGE_05_SMALL_UTILITY.luau](lessons/STAGE_05_SMALL_UTILITY.luau)
+**Downloadable code:** [STAGE_05_SMALL_UTILITY.luau](lessons/STAGE_05_SMALL_UTILITY.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_05_SMALL_UTILITY.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_05_SMALL_UTILITY.luau -->
+```luau
+--!strict
+
+-- Use case: keep a percentage inside the valid 0-to-1 range.
+
+-- Step 1: write the smallest reusable operation.
+local function clamp01(value: number): number
+	return math.clamp(value, 0, 1)
+end
+
+-- Step 2: use it in two real callers before treating it as shared utility code.
+local function healthRatio(current: number, maximum: number): number
+	if maximum <= 0 then
+		return 0
+	end
+	return clamp01(current / maximum)
+end
+
+local function progressRatio(completed: number, required: number): number
+	if required <= 0 then
+		return 1
+	end
+	return clamp01(completed / required)
+end
+
+-- Step 3: check boundaries as well as the normal case.
+assert(healthRatio(50, 100) == 0.5)
+assert(healthRatio(150, 100) == 1)
+assert(progressRatio(-2, 10) == 0)
+assert(progressRatio(0, 0) == 1)
+
+print("Stage 5 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_05_SMALL_UTILITY.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read the one-purpose `clamp01()` function.
 2. See two real callers reuse it without depending on each other.

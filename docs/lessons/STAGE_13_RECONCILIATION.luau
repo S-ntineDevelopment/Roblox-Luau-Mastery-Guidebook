@@ -16,7 +16,7 @@ local function apply(state: ClientState, command: InputCommand)
 	state.position += command.delta
 end
 
--- Step 1: local input predicts immediately and enters bounded history.
+-- Step 1: local input predicts immediately and enters pending history.
 local function predict(state: ClientState, command: InputCommand)
 	apply(state, command)
 	table.insert(state.pending, command)

@@ -7,7 +7,67 @@
 
 **Use case:** Convert an untrusted fire-request table into a small trusted record before gameplay code uses it.
 
-**Complete code:** [STAGE_08_NETWORK_VALIDATION.luau](lessons/STAGE_08_NETWORK_VALIDATION.luau)
+**Downloadable code:** [STAGE_08_NETWORK_VALIDATION.luau](lessons/STAGE_08_NETWORK_VALIDATION.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_08_NETWORK_VALIDATION.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_08_NETWORK_VALIDATION.luau -->
+```luau
+--!strict
+
+-- Use case: turn an untrusted fire payload into a small trusted record.
+
+type FireRequest = {
+	sequence: number,
+	directionX: number,
+}
+
+-- Step 1: accept unknown at the trust boundary.
+local function decodeFireRequest(value: unknown): FireRequest?
+	if type(value) ~= "table" then
+		return nil
+	end
+
+	local record = value :: { [string]: unknown }
+	local sequence = record.sequence
+	local directionX = record.directionX
+
+	-- Step 2: validate type, integer/range, and finite numeric values.
+	if type(sequence) ~= "number" or sequence % 1 ~= 0 or sequence < 1 then
+		return nil
+	end
+	if type(directionX) ~= "number" or not math.isfinite(directionX) then
+		return nil
+	end
+	if directionX < -1 or directionX > 1 then
+		return nil
+	end
+
+	-- Return a fresh trusted record, not the caller's table.
+	return { sequence = sequence, directionX = directionX }
+end
+
+-- Step 3: exercise a valid and malformed payload.
+local accepted = decodeFireRequest({ sequence = 1, directionX = 0.5 })
+assert(accepted ~= nil and accepted.sequence == 1)
+assert(decodeFireRequest({ sequence = 0, directionX = 4 }) == nil)
+assert(decodeFireRequest("not a table") == nil)
+
+print("Stage 8 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_08_NETWORK_VALIDATION.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. `decodeFireRequest()` accepts `unknown`, because the boundary has not trusted the payload yet.
 2. It validates the sequence and direction type, integer/range, and finite-number requirements.

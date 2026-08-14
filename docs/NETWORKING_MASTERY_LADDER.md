@@ -8,7 +8,67 @@ Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) and [Stage 
 
 **Use case:** Admit small ordered client messages while rejecting replay and excess requests.
 
-**Complete code:** [NETWORKING_LADDER_ADMISSION.luau](lessons/NETWORKING_LADDER_ADMISSION.luau)
+**Downloadable code:** [NETWORKING_LADDER_ADMISSION.luau](lessons/NETWORKING_LADDER_ADMISSION.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/NETWORKING_LADDER_ADMISSION.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: NETWORKING_LADDER_ADMISSION.luau -->
+```luau
+--!strict
+
+-- Use case: admit ordered client messages under a simple per-player limit.
+
+type Packet = {
+	sequence: number,
+	payload: string,
+}
+
+type PeerState = {
+	lastSequence: number,
+	requestsThisWindow: number,
+}
+
+-- Step 1: check bounded payload and strictly newer sequence.
+local function admit(state: PeerState, packet: Packet, maximumRequests: number): boolean
+	if #packet.payload > 32 then
+		return false
+	end
+	if packet.sequence <= state.lastSequence then
+		return false
+	end
+
+	-- Step 2: apply a workload limit before committing sequence state.
+	if state.requestsThisWindow >= maximumRequests then
+		return false
+	end
+
+	state.requestsThisWindow += 1
+	state.lastSequence = packet.sequence
+	return true
+end
+
+-- Step 3: exercise success, replay rejection, and rate rejection.
+local state: PeerState = { lastSequence = 0, requestsThisWindow = 0 }
+assert(admit(state, { sequence = 1, payload = "jump" }, 2))
+assert(not admit(state, { sequence = 1, payload = "replay" }, 2))
+assert(admit(state, { sequence = 2, payload = "move" }, 2))
+assert(not admit(state, { sequence = 3, payload = "extra" }, 2))
+
+print("Networking lesson passed")
+```
+<!-- END VERIFIED LESSON: NETWORKING_LADDER_ADMISSION.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. `Packet` contains only a sequence and small payload for this lesson.
 2. `admit()` checks payload size, newer sequence, and per-window request count before committing state.

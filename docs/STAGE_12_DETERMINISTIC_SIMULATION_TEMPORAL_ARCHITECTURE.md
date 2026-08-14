@@ -7,7 +7,63 @@
 
 **Use case:** Move a value at a fixed interval and retain copied history for inspection.
 
-**Complete code:** [STAGE_12_FIXED_STEP.luau](lessons/STAGE_12_FIXED_STEP.luau)
+**Downloadable code:** [STAGE_12_FIXED_STEP.luau](lessons/STAGE_12_FIXED_STEP.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_12_FIXED_STEP.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_12_FIXED_STEP.luau -->
+```luau
+--!strict
+
+-- Use case: step a simple position simulation and copy a snapshot.
+
+type State = {
+	position: number,
+	velocity: number,
+}
+
+-- Step 1: keep one simulation step free of external side effects.
+local function step(state: State, deltaTime: number)
+	state.position += state.velocity * deltaTime
+end
+
+-- Step 2: copy serializable state instead of returning the live table.
+local function snapshot(state: State): State
+	return {
+		position = state.position,
+		velocity = state.velocity,
+	}
+end
+
+-- Step 3: run the same fixed interval and inspect history.
+local state: State = { position = 0, velocity = 4 }
+local history: { State } = {}
+
+for _ = 1, 3 do
+	step(state, 0.25)
+	table.insert(history, snapshot(state))
+end
+
+assert(state.position == 3)
+assert(history[1].position == 1)
+state.position = 99
+assert(history[3].position == 3)
+
+print("Stage 12 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_12_FIXED_STEP.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. `step()` changes only simulation state from explicit inputs.
 2. `snapshot()` copies the two scalar fields instead of exposing the live table.

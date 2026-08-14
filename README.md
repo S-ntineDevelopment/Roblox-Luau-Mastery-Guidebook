@@ -51,4 +51,4 @@ This repository intentionally contains learning material only. It excludes proje
 
 The guidebook treats patterns as options, not maturity requirements. It distinguishes platform facts, security requirements, engineering heuristics, project policy, and claims that need profiling or runtime proof. Each stage includes primary references, suggested prerequisites, a three-step beginner lesson, practice work, and completion evidence.
 
-The 20 standalone lesson programs use `--!strict` and assertions. They were checked with the official Luau analyzer and runtime; use the included scripts under `tools/` to repeat those checks with a current Luau release.
+Every stage page shows its complete working lesson before the optional theory. The 20 standalone lesson programs use `--!strict` and assertions, and the verification script checks that the visible Markdown code exactly matches the analyzed source. Use the included scripts under `tools/` to repeat the type and runtime checks with a current Luau release.

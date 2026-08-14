@@ -23,7 +23,7 @@ local function grantCoins(profile: Profile, transactionId: string, amount: numbe
 	return true
 end
 
--- Step 3: call the same transaction twice and inspect the durable model.
+-- Step 3: call the same transaction twice and inspect the state to be saved.
 local profile: Profile = {
 	coins = 10,
 	appliedTransactions = {},

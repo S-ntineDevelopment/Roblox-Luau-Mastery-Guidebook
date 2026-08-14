@@ -7,7 +7,61 @@
 
 **Use case:** Keep only the three most recent lifecycle messages so diagnostics cannot grow forever.
 
-**Complete code:** [STAGE_07_DIAGNOSTICS.luau](lessons/STAGE_07_DIAGNOSTICS.luau)
+**Downloadable code:** [STAGE_07_DIAGNOSTICS.luau](lessons/STAGE_07_DIAGNOSTICS.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_07_DIAGNOSTICS.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_07_DIAGNOSTICS.luau -->
+```luau
+--!strict
+
+-- Use case: retain only the three most recent diagnostic messages.
+
+-- Step 1: use a small record with an explicit capacity.
+type Diagnostics = {
+	capacity: number,
+	messages: { string },
+}
+
+local function newDiagnostics(capacity: number): Diagnostics
+	assert(capacity > 0, "capacity must be positive")
+	return { capacity = capacity, messages = {} }
+end
+
+-- Step 2: enforce the retention bound when recording.
+local function record(diagnostics: Diagnostics, message: string)
+	table.insert(diagnostics.messages, message)
+	while #diagnostics.messages > diagnostics.capacity do
+		table.remove(diagnostics.messages, 1)
+	end
+end
+
+-- Step 3: record enough events to prove old history is removed.
+local diagnostics = newDiagnostics(3)
+record(diagnostics, "joined")
+record(diagnostics, "spawned")
+record(diagnostics, "died")
+record(diagnostics, "respawned")
+
+assert(#diagnostics.messages == 3)
+assert(diagnostics.messages[1] == "spawned")
+assert(diagnostics.messages[3] == "respawned")
+
+print("Stage 7 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_07_DIAGNOSTICS.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read `Diagnostics`; capacity and retained messages are explicit.
 2. Follow `record()` as it appends and evicts the oldest extra item.

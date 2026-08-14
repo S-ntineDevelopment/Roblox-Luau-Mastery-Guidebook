@@ -21,7 +21,7 @@ local function decodeFireRequest(value: unknown): FireRequest?
 	if type(sequence) ~= "number" or sequence % 1 ~= 0 or sequence < 1 then
 		return nil
 	end
-	if type(directionX) ~= "number" or directionX ~= directionX then
+	if type(directionX) ~= "number" or not math.isfinite(directionX) then
 		return nil
 	end
 	if directionX < -1 or directionX > 1 then

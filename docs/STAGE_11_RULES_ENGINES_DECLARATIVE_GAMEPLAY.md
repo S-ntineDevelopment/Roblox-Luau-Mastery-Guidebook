@@ -7,7 +7,81 @@
 
 **Use case:** Grant ten coins when a player has at least three wins.
 
-**Complete code:** [STAGE_11_SMALL_RULES.luau](lessons/STAGE_11_SMALL_RULES.luau)
+**Downloadable code:** [STAGE_11_SMALL_RULES.luau](lessons/STAGE_11_SMALL_RULES.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_11_SMALL_RULES.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_11_SMALL_RULES.luau -->
+```luau
+--!strict
+
+-- Use case: grant a reward only when a player has enough wins.
+
+type PlayerState = {
+	wins: number,
+	coins: number,
+}
+
+type Condition = {
+	kind: "MinimumWins",
+	amount: number,
+}
+
+type Effect = {
+	kind: "GrantCoins",
+	amount: number,
+}
+
+type Rule = {
+	condition: Condition,
+	effect: Effect,
+}
+
+-- Step 1: keep condition evaluation separate from mutation.
+local function passes(state: PlayerState, condition: Condition): boolean
+	return state.wins >= condition.amount
+end
+
+-- Step 2: apply only known, validated effects.
+local function applyEffect(state: PlayerState, effect: Effect)
+	assert(effect.amount > 0, "reward must be positive")
+	state.coins += effect.amount
+end
+
+local function runRule(state: PlayerState, rule: Rule): boolean
+	if not passes(state, rule.condition) then
+		return false
+	end
+	applyEffect(state, rule.effect)
+	return true
+end
+
+-- Step 3: test a passing and failing player.
+local rule: Rule = {
+	condition = { kind = "MinimumWins", amount = 3 },
+	effect = { kind = "GrantCoins", amount = 10 },
+}
+
+local ready: PlayerState = { wins = 3, coins = 0 }
+local notReady: PlayerState = { wins = 2, coins = 0 }
+assert(runRule(ready, rule) and ready.coins == 10)
+assert(not runRule(notReady, rule) and notReady.coins == 0)
+
+print("Stage 11 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_11_SMALL_RULES.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. The `Rule` record contains condition data and effect data.
 2. `passes()` reads state without mutation; `applyEffect()` owns the mutation.

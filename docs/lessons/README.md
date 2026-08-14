@@ -1,6 +1,6 @@
 # Type-Checked Curriculum Lessons
 
-Every lesson is a small, standalone Luau program. The files use `--!strict`, avoid hidden framework dependencies, and progress through three ideas:
+Every lesson is a small, standalone Luau program, and the exact program is embedded directly in its curriculum page. The files use `--!strict`, avoid hidden framework dependencies, and progress through three ideas:
 
 1. define the smallest useful data or contract;
 2. perform one real operation;
@@ -8,7 +8,7 @@ Every lesson is a small, standalone Luau program. The files use `--!strict`, avo
 
 **Verification snapshot:** all 20 lessons passed `luau-analyze` and the Luau CLI runtime from the official Luau `0.733` Windows release on 2026-08-14. Re-run the checks when the compiler version changes.
 
-The examples model Roblox use cases without requiring Roblox globals, so the official Luau command-line analyzer can check them. Engine-specific behavior still needs Studio/runtime verification.
+The examples model Roblox use cases without requiring Roblox globals, so the official Luau command-line analyzer can check them. The verification script also proves that each visible Markdown code block is identical to its checked `.luau` source. Engine-specific behavior still needs Studio/runtime verification.
 
 Run every lesson with:
 

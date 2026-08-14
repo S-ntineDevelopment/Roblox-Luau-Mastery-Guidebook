@@ -1,6 +1,6 @@
 --!strict
 
--- Use case: split pure numeric work into chunks and merge the results.
+-- Use case: prepare pure numeric work for chunks and merge them serially.
 
 type Job = {
 	firstIndex: number,

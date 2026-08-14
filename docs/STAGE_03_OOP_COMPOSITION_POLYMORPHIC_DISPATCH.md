@@ -7,7 +7,73 @@
 
 **Use case:** Firing needs an ammo source and a sound function, but it does not need a base weapon class.
 
-**Complete code:** [STAGE_03_COMPOSITION.luau](lessons/STAGE_03_COMPOSITION.luau)
+**Downloadable code:** [STAGE_03_COMPOSITION.luau](lessons/STAGE_03_COMPOSITION.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_03_COMPOSITION.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_03_COMPOSITION.luau -->
+```luau
+--!strict
+
+-- Use case: build a tiny weapon from replaceable ammo and sound behavior.
+
+-- Step 1: define only the operations the weapon needs.
+type AmmoStore = {
+	takeOne: (self: AmmoStore) -> boolean,
+}
+
+type PlaySound = (soundId: string) -> ()
+
+-- Step 2: create a simple ammo implementation.
+local function newAmmoStore(startingAmmo: number): AmmoStore
+	local store: AmmoStore
+	store = {
+		takeOne = function(_self: AmmoStore): boolean
+			if startingAmmo <= 0 then
+				return false
+			end
+
+			startingAmmo -= 1
+			return true
+		end,
+	}
+	return store
+end
+
+-- Step 3: inject the collaborators instead of finding globals inside fire().
+local function fire(ammo: AmmoStore, playSound: PlaySound): boolean
+	if not ammo:takeOne() then
+		return false
+	end
+
+	playSound("Fire")
+	return true
+end
+
+local played: { string } = {}
+local ammo = newAmmoStore(1)
+
+assert(fire(ammo, function(soundId: string)
+	table.insert(played, soundId)
+end))
+assert(not fire(ammo, function(_soundId: string) end))
+assert(played[1] == "Fire")
+
+print("Stage 3 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_03_COMPOSITION.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read the `AmmoStore` and `PlaySound` contracts; each exposes one operation.
 2. Follow `newAmmoStore(1)` to see state captured by a closure.

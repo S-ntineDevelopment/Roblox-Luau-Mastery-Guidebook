@@ -19,7 +19,11 @@ local function tryRun(
 	distance: number
 ): string?
 	local definition = platform.definitions[id]
-	if definition == nil or distance > definition.maximumDistance then
+	if definition == nil
+		or not math.isfinite(distance)
+		or distance < 0
+		or distance > definition.maximumDistance
+	then
 		return nil
 	end
 	return definition.run(playerName)

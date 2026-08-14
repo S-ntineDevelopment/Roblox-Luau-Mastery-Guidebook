@@ -7,7 +7,67 @@
 
 **Use case:** Separately owned features can register actions under stable IDs.
 
-**Complete code:** [STAGE_06_ACTION_CONTRACT.luau](lessons/STAGE_06_ACTION_CONTRACT.luau)
+**Downloadable code:** [STAGE_06_ACTION_CONTRACT.luau](lessons/STAGE_06_ACTION_CONTRACT.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_06_ACTION_CONTRACT.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_06_ACTION_CONTRACT.luau -->
+```luau
+--!strict
+
+-- Use case: register named actions and reject duplicate IDs.
+
+-- Step 1: define the smallest behavior contract.
+type Action = (playerName: string) -> string
+
+type ActionRegistry = {
+	actions: { [string]: Action },
+}
+
+-- Step 2: validate registration once.
+local function register(registry: ActionRegistry, id: string, action: Action): boolean
+	if id == "" or registry.actions[id] ~= nil then
+		return false
+	end
+
+	registry.actions[id] = action
+	return true
+end
+
+local function run(registry: ActionRegistry, id: string, playerName: string): string?
+	local action = registry.actions[id]
+	if action == nil then
+		return nil
+	end
+	return action(playerName)
+end
+
+-- Step 3: register one feature and exercise success and failure.
+local registry: ActionRegistry = { actions = {} }
+assert(register(registry, "Greet", function(playerName: string): string
+	return `Hello, {playerName}!`
+end))
+assert(not register(registry, "Greet", function(): string
+	return "duplicate"
+end))
+assert(run(registry, "Greet", "Ari") == "Hello, Ari!")
+assert(run(registry, "Missing", "Ari") == nil)
+
+print("Stage 6 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_06_ACTION_CONTRACT.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read `Action`; every implementation accepts a player name and returns text.
 2. Follow `register()` to see empty and duplicate IDs rejected at admission.

@@ -7,7 +7,92 @@
 
 **Use case:** A round system needs to remember who is ready, process messages in order, and keep a small count.
 
-**Complete code:** [STAGE_01_TABLES_AND_METATABLES.luau](lessons/STAGE_01_TABLES_AND_METATABLES.luau)
+**Downloadable code:** [STAGE_01_TABLES_AND_METATABLES.luau](lessons/STAGE_01_TABLES_AND_METATABLES.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_01_TABLES_AND_METATABLES.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_01_TABLES_AND_METATABLES.luau -->
+```luau
+--!strict
+
+-- Use case: track ready players, process messages in order, and create counters.
+
+-- Step 1: a dictionary can act as a set.
+local readyByUserId: { [number]: boolean } = {}
+readyByUserId[101] = true
+readyByUserId[202] = true
+readyByUserId[101] = nil
+
+assert(readyByUserId[101] == nil)
+assert(readyByUserId[202] == true)
+
+-- Step 2: a queue uses a head index so dequeue does not shift every item.
+type Queue = {
+	items: { [number]: string },
+	head: number,
+	tail: number,
+}
+
+local function newQueue(): Queue
+	return { items = {}, head = 1, tail = 0 }
+end
+
+local function enqueue(queue: Queue, message: string)
+	queue.tail += 1
+	queue.items[queue.tail] = message
+end
+
+local function dequeue(queue: Queue): string?
+	if queue.head > queue.tail then
+		return nil
+	end
+
+	local message = queue.items[queue.head]
+	queue.items[queue.head] = nil
+	queue.head += 1
+	return message
+end
+
+local messages = newQueue()
+enqueue(messages, "first")
+enqueue(messages, "second")
+assert(dequeue(messages) == "first")
+
+-- Step 3: __index can provide method lookup for a small object.
+type CounterData = { value: number }
+
+local Counter = {}
+Counter.__index = Counter
+
+type Counter = typeof(setmetatable({} :: CounterData, Counter))
+
+function Counter.new(startValue: number): Counter
+	return setmetatable({ value = startValue }, Counter)
+end
+
+function Counter.increment(self: Counter): number
+	self.value += 1
+	return self.value
+end
+
+local counter = Counter.new(4)
+assert(counter:increment() == 5)
+
+print("Stage 1 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_01_TABLES_AND_METATABLES.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read the `readyByUserId` dictionary. A key exists when that player is ready; assigning `nil` removes it.
 2. Follow `enqueue()` and `dequeue()`. The moving `head` keeps old items from being shifted on every read.

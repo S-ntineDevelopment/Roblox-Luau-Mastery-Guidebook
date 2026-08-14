@@ -7,7 +7,64 @@
 
 **Use case:** A countdown must stop changing state after its round is cancelled.
 
-**Complete code:** [STAGE_04_ASYNC_OWNERSHIP.luau](lessons/STAGE_04_ASYNC_OWNERSHIP.luau)
+**Downloadable code:** [STAGE_04_ASYNC_OWNERSHIP.luau](lessons/STAGE_04_ASYNC_OWNERSHIP.luau)
+
+### Run this before reading the theory
+
+- **Luau CLI:** `luau docs/lessons/STAGE_04_ASYNC_OWNERSHIP.luau`
+- **Roblox Studio:** paste the code into a temporary `Script` and run the experience. These examples avoid Roblox services so the first behavior is easy to see.
+- Read the `Step 1`, `Step 2`, and `Step 3` comments in order.
+
+### Complete working example
+
+The `type` declarations are checker notes. They describe the allowed shape of a value, but they do not perform the behavior. The working behavior is in the functions, table operations, calls, and assertions below.
+
+<!-- BEGIN VERIFIED LESSON: STAGE_04_ASYNC_OWNERSHIP.luau -->
+```luau
+--!strict
+
+-- Use case: prevent a cancelled countdown from applying later work.
+
+-- Step 1: the owner keeps a cancellation state.
+type Operation = {
+	cancelled: boolean,
+}
+
+local function cancel(operation: Operation)
+	operation.cancelled = true
+end
+
+-- Step 2: every delayed callback checks the owner's current state.
+local function runCountdown(operation: Operation, steps: number, onStep: (number) -> ())
+	for remaining = steps, 1, -1 do
+		if operation.cancelled then
+			return
+		end
+		onStep(remaining)
+	end
+end
+
+-- Step 3: prove cancellation blocks later mutation.
+local operation: Operation = { cancelled = false }
+local visited: { number } = {}
+
+runCountdown(operation, 3, function(remaining: number)
+	table.insert(visited, remaining)
+	if remaining == 2 then
+		cancel(operation)
+	end
+end)
+
+assert(#visited == 2)
+assert(visited[1] == 3 and visited[2] == 2)
+
+print("Stage 4 lesson passed")
+```
+<!-- END VERIFIED LESSON: STAGE_04_ASYNC_OWNERSHIP.luau -->
+
+### Walk through the behavior
+
+Read the three points, run the code, and complete **Try it**. Once you can explain the assertions, this stage's beginner pass is done. Everything after this guided lesson is optional reference material for later.
 
 1. Read the `Operation` record; it is the owner-visible cancellation state.
 2. Notice that `runCountdown()` checks cancellation before each callback.
