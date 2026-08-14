@@ -1,4 +1,7 @@
-# Stage 3: Coroutines, Scheduling, and Async Control Flow
+# Stage 4: Coroutines, Scheduling, and Async Control Flow
+
+**Difficulty:** Foundation
+**Suggested prerequisites:** Stages 1-3
 
 Roblox code frequently waits for events, frames, network replies, and cloud services. The goal of this stage is to make those waits understandable and bounded—not to replace the engine scheduler with a custom framework.
 

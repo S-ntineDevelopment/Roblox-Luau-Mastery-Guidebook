@@ -1,4 +1,7 @@
-# Stage 5: Typed Luau and Static Contracts
+# Stage 2: Typed Luau and Static Contracts
+
+**Difficulty:** Foundation
+**Suggested prerequisite:** Stage 1
 
 Luau is gradually and structurally typed. Its type checker can improve editor feedback and refactor safety, but annotations do not validate runtime values, make tables immutable, or create nominal types automatically.
 

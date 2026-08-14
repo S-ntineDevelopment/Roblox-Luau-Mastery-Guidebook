@@ -1,4 +1,7 @@
-# Stage 10: Scaling Architecture and Domain Platforms
+# Stage 15: Scaling Architecture and Domain Platforms
+
+**Difficulty:** Advanced
+**Suggested prerequisites:** Stages 3 and 5-9, plus several concrete features to compare
 
 A domain platform is shared infrastructure for a family of related features, such as weapons, quests, vehicles, or purchases. It is valuable after the domain’s stable rules and meaningful variations are understood. It is not a maturity badge that every codebase must build.
 

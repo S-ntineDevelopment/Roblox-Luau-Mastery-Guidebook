@@ -1,5 +1,8 @@
 # Stage 16: Templates, Code Generation, and Static Analysis
 
+**Difficulty:** Production mastery
+**Suggested prerequisites:** Stages 2 and 5-7
+
 Tooling can automate repeatable syntax and detectable repository policy. It cannot generally prove runtime authority, lifecycle correctness, network security, visual quality, or live-provider behavior.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

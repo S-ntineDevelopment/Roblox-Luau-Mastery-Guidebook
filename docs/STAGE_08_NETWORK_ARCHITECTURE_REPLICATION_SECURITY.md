@@ -1,5 +1,8 @@
 # Stage 8: Networking, Replication, and Security
 
+**Difficulty:** Intermediate
+**Suggested prerequisites:** Stages 2, 4, 6, and 7
+
 Roblox already replicates the DataModel, physics, and supported properties. Custom remotes supplement that system; they are not automatically the primary representation of all state.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

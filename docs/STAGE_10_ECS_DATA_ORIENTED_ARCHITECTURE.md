@@ -1,4 +1,7 @@
-# Stage 1: ECS and Data-Oriented Design
+# Stage 10: ECS and Data-Oriented Design
+
+**Difficulty:** Advanced
+**Suggested prerequisites:** Stages 1-4; Stage 7 is strongly recommended
 
 Entity Component System (ECS) is one architecture for representing many entities and applying shared operations to their data. It is not the definition of good Roblox architecture and it is not required for service/controller, feature-package, object-oriented, or functional codebases.
 

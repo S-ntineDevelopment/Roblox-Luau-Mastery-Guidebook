@@ -1,5 +1,8 @@
 # Stage 17: Parallel Luau and Scalability
 
+**Difficulty:** Production mastery
+**Suggested prerequisites:** Stages 4, 7, and 10
+
 Parallel execution can reduce elapsed CPU time for suitable workloads. It also adds Actor/VM boundaries, safe-API restrictions, communication cost, and harder debugging. Profile first.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

@@ -1,4 +1,7 @@
-# Stage 12: Utilities and Engine Foundations
+# Stage 5: Utilities and Engine Foundations
+
+**Difficulty:** Intermediate
+**Suggested prerequisites:** Stages 1-4
 
 Utilities should reduce repeated semantic work. They should not become a second standard library, a mandatory wrapper around every Roblox API, or a dependency maze called an “engine.”
 

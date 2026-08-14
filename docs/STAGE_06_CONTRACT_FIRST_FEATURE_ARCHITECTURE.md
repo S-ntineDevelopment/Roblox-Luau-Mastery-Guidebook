@@ -1,4 +1,7 @@
-# Stage 14: Contract-First Feature Design
+# Stage 6: Contract-First Feature Design
+
+**Difficulty:** Intermediate
+**Suggested prerequisites:** Stages 2-5
 
 A contract describes what callers and implementations may rely on. Designing that boundary early is useful when multiple owners, implementations, or trust domains must coordinate. It is not a reason to create an interface and registry for every feature.
 

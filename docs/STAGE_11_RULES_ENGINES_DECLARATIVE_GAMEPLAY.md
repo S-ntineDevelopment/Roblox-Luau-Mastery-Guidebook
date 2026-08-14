@@ -1,4 +1,7 @@
-# Stage 15: Rules Engines and Declarative Gameplay
+# Stage 11: Rules Engines and Declarative Gameplay
+
+**Difficulty:** Advanced
+**Suggested prerequisites:** Stages 1-7
 
 A rules engine interprets data or composable rule objects to decide gameplay outcomes. It is useful when many features share stable evaluation semantics. It can also turn simple code into a difficult custom language.
 

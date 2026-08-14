@@ -1,4 +1,7 @@
-# Stage 6: Prediction, Reconciliation, Lag Compensation, and Rollback
+# Stage 13: Prediction, Reconciliation, Lag Compensation, and Rollback
+
+**Difficulty:** Advanced
+**Suggested prerequisites:** Stages 8 and 12; Stage 10 is optional
 
 Latency techniques solve different problems. A Roblox game should use only the techniques its mechanics need and its simulation can support.
 

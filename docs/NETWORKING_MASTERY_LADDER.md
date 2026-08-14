@@ -139,7 +139,7 @@ Practice: deliberately drop/reorder an unreliable delta and demonstrate recovery
 
 ## Level 9: Latency presentation
 
-Choose separately among interpolation, extrapolation, prediction, reconciliation, lag compensation, and rollback. See [Stage 6](STAGE_06_ROLLBACK_NETCODE_PREDICTION_RECONCILIATION.md).
+Choose separately among interpolation, extrapolation, prediction, reconciliation, lag compensation, and rollback. See [Stage 13](STAGE_13_ROLLBACK_NETCODE_PREDICTION_RECONCILIATION.md).
 
 ECS is not a prerequisite. Plain records, services, or objects can provide snapshot state. Fixed ticks are not a determinism guarantee.
 

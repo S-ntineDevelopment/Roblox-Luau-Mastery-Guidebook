@@ -1,4 +1,7 @@
-# Stage 13: AI and NPC Systems
+# Stage 14: AI and NPC Systems
+
+**Difficulty:** Advanced
+**Suggested prerequisites:** Stages 3, 4, 7, and 8
 
 NPC architecture depends on what the NPC can affect. A cosmetic crowd can be mostly client-side; a competitive combatant’s damage, rewards, and target eligibility need server authority. No single behavior formalism fits every NPC.
 

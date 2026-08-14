@@ -1,4 +1,7 @@
-# Stage 2: Objects, Composition, and Polymorphic Dispatch
+# Stage 3: Objects, Composition, and Polymorphic Dispatch
+
+**Difficulty:** Foundation
+**Suggested prerequisites:** Stages 1-2
 
 Luau supports functions, closures, tables, modules, and metatables. “OOP” is one way to organize those tools; it is not required for a service/controller architecture and does not imply inheritance.
 

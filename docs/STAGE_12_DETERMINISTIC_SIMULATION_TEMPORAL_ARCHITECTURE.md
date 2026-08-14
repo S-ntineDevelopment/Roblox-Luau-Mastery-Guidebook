@@ -1,4 +1,7 @@
-# Stage 7: Simulation Time, History, and Replay
+# Stage 12: Simulation Time, History, and Replay
+
+**Difficulty:** Advanced
+**Suggested prerequisites:** Stages 2, 4, and 7
 
 Time-sensitive code needs explicit clocks and state history only to the degree required by the mechanic. “Deterministic” must name the environment, inputs, and tolerance being claimed.
 

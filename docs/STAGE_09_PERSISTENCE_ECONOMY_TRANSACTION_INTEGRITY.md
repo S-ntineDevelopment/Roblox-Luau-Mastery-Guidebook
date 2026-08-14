@@ -1,4 +1,7 @@
-# Stage 11: Persistence and Economy Integrity
+# Stage 9: Persistence and Economy Integrity
+
+**Difficulty:** Intermediate
+**Suggested prerequisites:** Stages 2, 4, and 6-8
 
 Persistent state outlives a server process, so failures, retries, old schemas, and concurrent writers are normal design inputs. Roblox DataStores are key-value storage, not a general relational database or multi-key ACID transaction system.
 

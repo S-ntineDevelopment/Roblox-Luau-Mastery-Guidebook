@@ -1,4 +1,7 @@
-# Stage 9: Runtime Tooling and Observability
+# Stage 7: Runtime Tooling, Testing, and Observability
+
+**Difficulty:** Intermediate
+**Suggested prerequisites:** Stages 1-6
 
 Observability is evidence collected to answer operational questions. More logs and dashboards do not automatically make a system observable.
 

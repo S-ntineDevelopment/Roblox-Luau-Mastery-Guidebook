@@ -1,5 +1,8 @@
 # Stage 18: Release Engineering, Versioning, and LiveOps
 
+**Difficulty:** Production mastery
+**Suggested prerequisites:** Stages 7-9 and the advanced stages used by the project
+
 Release engineering manages change while servers, players, saved data, and external systems may still reflect older versions. The amount of process should be proportional to the blast radius.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
