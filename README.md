@@ -9,6 +9,7 @@ This repository intentionally contains learning material only. It excludes proje
 1. [Bare Minimum Prerequisites](docs/prerequisites/BARE_MINIMUM.md)
 2. [Accuracy and Applicability Standard](docs/CURRICULUM_ACCURACY_STANDARD.md)
 3. [Master Curriculum and Practice Path](docs/ROBLOX_LUAU_MASTERY_CURRICULUM.md)
+4. [Type-Checked Beginner Lessons](docs/lessons/README.md)
 
 ## Tier 1 — Luau foundations
 
@@ -48,4 +49,6 @@ This repository intentionally contains learning material only. It excludes proje
 
 ## Scope
 
-The guidebook treats patterns as options, not maturity requirements. It distinguishes platform facts, security requirements, engineering heuristics, project policy, and claims that need profiling or runtime proof. Each stage includes primary references, suggested prerequisites, practice work, and completion evidence.
+The guidebook treats patterns as options, not maturity requirements. It distinguishes platform facts, security requirements, engineering heuristics, project policy, and claims that need profiling or runtime proof. Each stage includes primary references, suggested prerequisites, a three-step beginner lesson, practice work, and completion evidence.
+
+The 20 standalone lesson programs use `--!strict` and assertions. They were checked with the official Luau analyzer and runtime; use the included scripts under `tools/` to repeat those checks with a current Luau release.

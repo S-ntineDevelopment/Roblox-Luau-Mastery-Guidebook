@@ -3,6 +3,20 @@
 **Difficulty:** Intermediate
 **Suggested prerequisites:** Stages 1-4
 
+## Guided lesson: extract one proven utility
+
+**Use case:** Health and quest progress both need a value clamped from `0` to `1`.
+
+**Complete code:** [STAGE_05_SMALL_UTILITY.luau](lessons/STAGE_05_SMALL_UTILITY.luau)
+
+1. Read the one-purpose `clamp01()` function.
+2. See two real callers reuse it without depending on each other.
+3. Check normal, over-maximum, negative, and zero-denominator cases.
+
+- **Expected result:** every ratio stays inside `0..1`.
+- **Try it:** add a stamina caller before changing the utility API.
+- **Common mistake:** building a large utility layer before two callers demonstrate the same semantics.
+
 Utilities should reduce repeated semantic work. They should not become a second standard library, a mandatory wrapper around every Roblox API, or a dependency maze called an “engine.”
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

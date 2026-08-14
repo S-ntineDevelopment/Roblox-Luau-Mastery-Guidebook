@@ -3,6 +3,20 @@
 **Difficulty:** Intermediate
 **Suggested prerequisites:** Stages 2, 4, and 6-8
 
+## Guided lesson: idempotent reward
+
+**Use case:** A retried daily reward must not add coins twice.
+
+**Complete code:** [STAGE_09_IDEMPOTENT_REWARD.luau](lessons/STAGE_09_IDEMPOTENT_REWARD.luau)
+
+1. Read the profile's balance and applied-transaction set.
+2. `grantCoins()` rejects malformed input and returns early for a known retry.
+3. The mutation and transaction record occur together in this small in-memory model.
+
+- **Expected result:** two calls with the same transaction ID leave the balance at `15`, not `20`.
+- **Try it:** add a second transaction ID and prove it grants once.
+- **Common mistake:** generating a new idempotency key for every retry, which makes duplicate requests look new.
+
 Persistent state outlives a server process, so failures, retries, old schemas, and concurrent writers are normal design inputs. Roblox DataStores are key-value storage, not a general relational database or multi-key ACID transaction system.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

@@ -3,6 +3,20 @@
 **Difficulty:** Production mastery
 **Suggested prerequisites:** Stages 4, 7, and 10
 
+## Guided lesson: partition and merge pure work
+
+**Use case:** Split six numbers into three independent jobs and combine their sums.
+
+**Complete code:** [STAGE_17_PARTITION_AND_MERGE.luau](lessons/STAGE_17_PARTITION_AND_MERGE.luau)
+
+1. `makeJobs()` describes disjoint index ranges; it does not create threads.
+2. `sumJob()` performs pure work over one range.
+3. The serial owner merges results in a defined order.
+
+- **Expected result:** three two-item jobs merge to total `21`.
+- **Try it:** use a chunk size of `4` and prove the total remains `21`.
+- **Common mistake:** adding Actors before measuring whether isolated work is large enough to repay communication and synchronization cost.
+
 Parallel execution can reduce elapsed CPU time for suitable workloads. It also adds Actor/VM boundaries, safe-API restrictions, communication cost, and harder debugging. Profile first.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

@@ -40,6 +40,12 @@ Each stage must distinguish:
 
 Do not convert a heuristic into an engine fact. Do not claim that a type annotation enforces runtime security, a fixed timestep guarantees deterministic results, a buffer is automatically cheaper, or an abstraction improves performance without measurement.
 
+## Lesson verification labels
+
+The complete `.luau` programs under [`docs/lessons`](lessons/README.md) are the curriculum's type-checked examples. A lesson may be called **type checked** only when the recorded `luau-analyze` command completes with no diagnostics for that exact file and compiler version. A lesson may be called **runtime checked** only when its assertions also run successfully.
+
+Markdown fragments elsewhere may be partial illustrations. Do not describe them as independently type checked unless they are identical to a checked lesson file. Neither label proves Roblox API behavior, Studio lifecycle, live-provider behavior, networking conditions, security, or performance.
+
 ## Current platform corrections
 
 - Luau is gradually typed. Static types do not exist as runtime validators and casts can suppress useful checking.

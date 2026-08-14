@@ -3,6 +3,20 @@
 **Difficulty:** Advanced
 **Suggested prerequisites:** Stages 1-4; Stage 7 is strongly recommended
 
+## Guided lesson: the smallest ECS-shaped update
+
+**Use case:** Regenerate every entity that currently has a health component.
+
+**Complete code:** [STAGE_10_TINY_ECS.luau](lessons/STAGE_10_TINY_ECS.luau)
+
+1. `healthByEntity` maps entity IDs to plain health records.
+2. `regenerate()` is a system-like function that processes every matching record.
+3. `math.min()` keeps current health under its maximum.
+
+- **Expected result:** entity `1` reaches `8`; entity `2` clamps at `10`.
+- **Try it:** add an entity with no health by storing it in a separate position table; regeneration should not know about it.
+- **Common mistake:** assuming this small dictionary is a full ECS or that ECS automatically improves performance.
+
 Entity Component System (ECS) is one architecture for representing many entities and applying shared operations to their data. It is not the definition of good Roblox architecture and it is not required for service/controller, feature-package, object-oriented, or functional codebases.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

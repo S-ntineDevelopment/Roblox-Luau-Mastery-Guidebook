@@ -3,6 +3,20 @@
 **Difficulty:** Advanced
 **Suggested prerequisites:** Stages 8 and 12; Stage 10 is optional
 
+## Guided lesson: correct and replay prediction
+
+**Use case:** A client predicts two movements, then receives server truth acknowledging only the first.
+
+**Complete code:** [STAGE_13_RECONCILIATION.luau](lessons/STAGE_13_RECONCILIATION.luau)
+
+1. `predict()` applies input immediately and records it by sequence.
+2. `reconcile()` replaces predicted position with admitted server position.
+3. Only commands newer than the acknowledgement are replayed and retained.
+
+- **Expected result:** prediction reaches `4`; server correction plus command `2` produces `3.5`.
+- **Try it:** acknowledge sequence `2` and prove pending history becomes empty.
+- **Common mistake:** calling interpolation, reconciliation, lag compensation, and rollback the same process.
+
 Latency techniques solve different problems. A Roblox game should use only the techniques its mechanics need and its simulation can support.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

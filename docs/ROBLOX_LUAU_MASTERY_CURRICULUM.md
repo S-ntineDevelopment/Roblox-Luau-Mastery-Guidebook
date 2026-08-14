@@ -4,6 +4,17 @@ This curriculum is ordered from foundational Luau structures to advanced product
 
 Read [Bare Minimum Prerequisites](prerequisites/BARE_MINIMUM.md) and [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) first.
 
+Every stage links a complete beginner lesson in [`docs/lessons`](lessons/README.md). Each lesson:
+
+- starts with one concrete use case;
+- introduces only three small steps;
+- uses `--!strict` and explicit types;
+- contains assertions for the expected result;
+- is checked by the official Luau analyzer and command-line runtime;
+- states the Roblox/Studio behavior that the standalone example cannot prove.
+
+Read the three steps in the stage, open the linked `.luau` file, predict each assertion, run it, then make the suggested one-line change.
+
 ## How difficulty is assigned
 
 Difficulty follows the kind of reasoning required, not how impressive a pattern sounds:

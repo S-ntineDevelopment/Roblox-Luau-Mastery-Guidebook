@@ -3,6 +3,20 @@
 **Difficulty:** Intermediate
 **Suggested prerequisites:** Stages 2, 4, 6, and 7
 
+## Guided lesson: admit one remote payload
+
+**Use case:** Convert an untrusted fire-request table into a small trusted record before gameplay code uses it.
+
+**Complete code:** [STAGE_08_NETWORK_VALIDATION.luau](lessons/STAGE_08_NETWORK_VALIDATION.luau)
+
+1. `decodeFireRequest()` accepts `unknown`, because the boundary has not trusted the payload yet.
+2. It validates the sequence and direction type, integer/range, and finite-number requirements.
+3. It returns a fresh `FireRequest` rather than passing the caller's mutable table inward.
+
+- **Expected result:** `{ sequence = 1, directionX = 0.5 }` is admitted; malformed values return `nil`.
+- **Try it:** add a bounded `weaponId` string.
+- **Common mistake:** checking only the static type or table shape while ignoring permissions, rate, ownership, and current server state.
+
 Roblox already replicates the DataModel, physics, and supported properties. Custom remotes supplement that system; they are not automatically the primary representation of all state.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

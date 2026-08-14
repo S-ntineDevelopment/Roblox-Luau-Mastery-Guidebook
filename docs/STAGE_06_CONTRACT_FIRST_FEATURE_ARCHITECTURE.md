@@ -3,6 +3,20 @@
 **Difficulty:** Intermediate
 **Suggested prerequisites:** Stages 2-5
 
+## Guided lesson: register one named action
+
+**Use case:** Separately owned features can register actions under stable IDs.
+
+**Complete code:** [STAGE_06_ACTION_CONTRACT.luau](lessons/STAGE_06_ACTION_CONTRACT.luau)
+
+1. Read `Action`; every implementation accepts a player name and returns text.
+2. Follow `register()` to see empty and duplicate IDs rejected at admission.
+3. Follow `run()` to see a missing action return `nil` instead of crashing.
+
+- **Expected result:** `Greet` returns `Hello, Ari!`; duplicate and missing registrations are controlled.
+- **Try it:** register a `Farewell` action without changing `run()`.
+- **Common mistake:** using a registry for three permanent variants that would be clearer in one direct table or conditional.
+
 A contract describes what callers and implementations may rely on. Designing that boundary early is useful when multiple owners, implementations, or trust domains must coordinate. It is not a reason to create an interface and registry for every feature.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

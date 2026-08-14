@@ -3,6 +3,20 @@
 **Difficulty:** Production mastery
 **Suggested prerequisites:** Stages 2 and 5-7
 
+## Guided lesson: validate before generating
+
+**Use case:** Generate a tiny Luau record type from a component descriptor.
+
+**Complete code:** [STAGE_16_GENERATION.luau](lessons/STAGE_16_GENERATION.luau)
+
+1. `validate()` rejects empty descriptors and duplicate field names.
+2. `generate()` runs only after validation and emits fields in declared order.
+3. Assertions check that both expected fields appear in the output.
+
+- **Expected result:** generated text contains `current: number` and `maximum: number`.
+- **Try it:** reject a descriptor containing two `current` fields.
+- **Common mistake:** trusting generated code merely because the generator completed; generated output still needs parsing/type checks.
+
 Tooling can automate repeatable syntax and detectable repository policy. It cannot generally prove runtime authority, lifecycle correctness, network security, visual quality, or live-provider behavior.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

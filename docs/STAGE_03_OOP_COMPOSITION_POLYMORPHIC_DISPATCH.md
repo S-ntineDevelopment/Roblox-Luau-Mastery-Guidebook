@@ -3,6 +3,20 @@
 **Difficulty:** Foundation
 **Suggested prerequisites:** Stages 1-2
 
+## Guided lesson: compose a tiny weapon
+
+**Use case:** Firing needs an ammo source and a sound function, but it does not need a base weapon class.
+
+**Complete code:** [STAGE_03_COMPOSITION.luau](lessons/STAGE_03_COMPOSITION.luau)
+
+1. Read the `AmmoStore` and `PlaySound` contracts; each exposes one operation.
+2. Follow `newAmmoStore(1)` to see state captured by a closure.
+3. Follow `fire()` to see both dependencies supplied directly by the caller.
+
+- **Expected result:** the first shot succeeds and records `Fire`; the second fails because ammo is empty.
+- **Try it:** provide a silent `PlaySound` function for a test.
+- **Common mistake:** creating inheritance, interfaces, or a dependency container when two function parameters are enough.
+
 Luau supports functions, closures, tables, modules, and metatables. “OOP” is one way to organize those tools; it is not required for a service/controller architecture and does not imply inheritance.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

@@ -3,6 +3,20 @@
 **Difficulty:** Foundation
 **Suggested prerequisite:** [Bare Minimum Prerequisites](prerequisites/BARE_MINIMUM.md)
 
+## Guided lesson: ready players, a queue, and a counter
+
+**Use case:** A round system needs to remember who is ready, process messages in order, and keep a small count.
+
+**Complete code:** [STAGE_01_TABLES_AND_METATABLES.luau](lessons/STAGE_01_TABLES_AND_METATABLES.luau)
+
+1. Read the `readyByUserId` dictionary. A key exists when that player is ready; assigning `nil` removes it.
+2. Follow `enqueue()` and `dequeue()`. The moving `head` keeps old items from being shifted on every read.
+3. Follow `Counter.new()` and `Counter.increment()`. `__index = Counter` lets the returned table find the method.
+
+- **Expected result:** the file prints `Stage 1 lesson passed`.
+- **Try it:** enqueue a third message and prove it leaves after `second`.
+- **Common mistake:** believing `__newindex` or a metatable automatically makes a table private or read-only.
+
 This is the first implementation stage. It starts with the structures used by almost every Roblox system before introducing objects, ECS, networking, rollback, or framework architecture.
 
 Read [Bare Minimum Prerequisites](prerequisites/BARE_MINIMUM.md) and [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) first.

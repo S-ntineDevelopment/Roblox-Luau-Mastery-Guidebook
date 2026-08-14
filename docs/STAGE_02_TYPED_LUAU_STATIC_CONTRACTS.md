@@ -3,6 +3,20 @@
 **Difficulty:** Foundation
 **Suggested prerequisite:** Stage 1
 
+## Guided lesson: a typed coin reward
+
+**Use case:** A reward function must either return the new balance or explain why it rejected the amount.
+
+**Complete code:** [STAGE_02_TYPED_LUAU.luau](lessons/STAGE_02_TYPED_LUAU.luau)
+
+1. Read `PlayerData` to see the input record's exact shape.
+2. Read `RewardResult` as two tagged alternatives: `{ ok = true }` and `{ ok = false }`.
+3. Follow the final `if result.ok` check. The tag tells the type checker which fields are available.
+
+- **Expected result:** valid `5` coins produces balance `15`; `-1` is rejected.
+- **Try it:** add a maximum reward of `100`.
+- **Common mistake:** assuming a static type validates data received from a remote or DataStore at runtime.
+
 Luau is gradually and structurally typed. Its type checker can improve editor feedback and refactor safety, but annotations do not validate runtime values, make tables immutable, or create nominal types automatically.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

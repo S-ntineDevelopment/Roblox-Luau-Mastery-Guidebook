@@ -4,6 +4,20 @@ Combat security protects authoritative outcomes and limits unnecessary informati
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md), [Stage 8](STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md), and the [Networking Ladder](NETWORKING_MASTERY_LADDER.md) first.
 
+## Guided lesson: validate one fire intent
+
+**Use case:** The client asks to fire; the server checks cadence, ammo, and range before changing state.
+
+**Complete code:** [COMBAT_SERVER_VALIDATION.luau](lessons/COMBAT_SERVER_VALIDATION.luau)
+
+1. `FireIntent` contains sequence and target distance—not damage, ammo, or rewards.
+2. `validateFire()` reads server-owned `WeaponState` and returns a specific rejection reason.
+3. Ammo and last-shot time change only after every check passes.
+
+- **Expected result:** the first shot succeeds; a shot `0.1` seconds later fails as too fast and spends no ammo.
+- **Try it:** submit a target beyond `maximumRange` and check the reason.
+- **Common mistake:** treating one valid shot or one suspicious shot as proof about the player's overall legitimacy.
+
 ## Threat model
 
 Assume a hostile client can:

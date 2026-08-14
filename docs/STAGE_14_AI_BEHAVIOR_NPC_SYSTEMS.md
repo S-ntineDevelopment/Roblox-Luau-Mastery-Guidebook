@@ -3,6 +3,20 @@
 **Difficulty:** Advanced
 **Suggested prerequisites:** Stages 3, 4, 7, and 8
 
+## Guided lesson: choose one NPC action
+
+**Use case:** An NPC chooses patrol, heal, or attack from current context.
+
+**Complete code:** [STAGE_14_NPC_DECISION.luau](lessons/STAGE_14_NPC_DECISION.luau)
+
+1. Each `Action` has a name and one scoring function.
+2. `chooseAction()` compares scores without executing any action.
+3. Low health makes `Heal` win; healthy visibility makes `Attack` win.
+
+- **Expected result:** the two test contexts select `Heal` and `Attack` respectively.
+- **Try it:** add a `Flee` action with a score higher than heal below `10%` health.
+- **Common mistake:** mixing perception, decision, movement, damage, animation, and replication into one update function.
+
 NPC architecture depends on what the NPC can affect. A cosmetic crowd can be mostly client-side; a competitive combatant’s damage, rewards, and target eligibility need server authority. No single behavior formalism fits every NPC.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

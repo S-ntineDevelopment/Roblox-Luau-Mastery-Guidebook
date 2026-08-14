@@ -3,6 +3,20 @@
 **Difficulty:** Advanced
 **Suggested prerequisites:** Stages 2, 4, and 7
 
+## Guided lesson: step and snapshot
+
+**Use case:** Move a value at a fixed interval and retain copied history for inspection.
+
+**Complete code:** [STAGE_12_FIXED_STEP.luau](lessons/STAGE_12_FIXED_STEP.luau)
+
+1. `step()` changes only simulation state from explicit inputs.
+2. `snapshot()` copies the two scalar fields instead of exposing the live table.
+3. Three `0.25`-second steps move velocity `4` from position `0` to `3`.
+
+- **Expected result:** history stores positions `1`, `2`, and `3`; later live-state mutation does not rewrite it.
+- **Try it:** replay from the first snapshot for two more steps.
+- **Common mistake:** claiming a fixed step alone makes Roblox physics or cross-device results deterministic.
+
 Time-sensitive code needs explicit clocks and state history only to the degree required by the mechanic. “Deterministic” must name the environment, inputs, and tolerance being claimed.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

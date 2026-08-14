@@ -16,6 +16,8 @@ Before [Stage 1](../STAGE_01_LUAU_TABLES_MODULES_METATABLES_DATA_STRUCTURES.md),
 
 If any item is unfamiliar, build two or three tiny scripts with it before continuing. Stage 1 then turns those language pieces into reusable data structures and small systems.
 
+Each stage has a standalone lesson under [`docs/lessons`](../lessons/README.md). Run the lesson exactly as written first, predict the assertions, and only then make the suggested change. The lesson files deliberately avoid framework and Roblox-global dependencies so ordinary Luau type checking can explain mistakes clearly.
+
 ## Tooling
 
 - Rojo project mapping through `default.project.json`.

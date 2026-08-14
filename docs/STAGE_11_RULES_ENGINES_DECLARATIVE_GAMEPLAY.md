@@ -3,6 +3,20 @@
 **Difficulty:** Advanced
 **Suggested prerequisites:** Stages 1-7
 
+## Guided lesson: one declarative reward rule
+
+**Use case:** Grant ten coins when a player has at least three wins.
+
+**Complete code:** [STAGE_11_SMALL_RULES.luau](lessons/STAGE_11_SMALL_RULES.luau)
+
+1. The `Rule` record contains condition data and effect data.
+2. `passes()` reads state without mutation; `applyEffect()` owns the mutation.
+3. `runRule()` applies the effect only after the condition passes.
+
+- **Expected result:** the three-win player receives coins; the two-win player does not.
+- **Try it:** change the required wins to `5` without changing evaluator code.
+- **Common mistake:** building a general scripting language when a typed record and two direct functions solve the problem.
+
 A rules engine interprets data or composable rule objects to decide gameplay outcomes. It is useful when many features share stable evaluation semantics. It can also turn simple code into a difficult custom language.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

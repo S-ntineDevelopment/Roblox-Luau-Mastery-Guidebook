@@ -3,6 +3,20 @@
 **Difficulty:** Production mastery
 **Suggested prerequisites:** Stages 7-9 and the advanced stages used by the project
 
+## Guided lesson: migrate data and gate rollout
+
+**Use case:** Convert a V1 save to V2 and enable a feature for one test user.
+
+**Complete code:** [STAGE_18_MIGRATION_AND_FLAG.luau](lessons/STAGE_18_MIGRATION_AND_FLAG.luau)
+
+1. `migrate()` accepts either supported version and always returns a copied V2 record.
+2. `FeatureFlag` declares a default plus an explicit user allow-list.
+3. Assertions verify both migration and the enabled/disabled users.
+
+- **Expected result:** V1 gains `level = 1`; user `101` is enabled while `202` is not.
+- **Try it:** add a V2 input with level `4` and prove migration preserves it.
+- **Common mistake:** deleting migration or compatibility code before old live data/protocols can no longer reach it.
+
 Release engineering manages change while servers, players, saved data, and external systems may still reflect older versions. The amount of process should be proportional to the blast radius.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

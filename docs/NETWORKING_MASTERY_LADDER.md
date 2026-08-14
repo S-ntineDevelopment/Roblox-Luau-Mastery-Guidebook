@@ -4,6 +4,20 @@ Networking mastery is the ability to choose the smallest correct communication m
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) and [Stage 8](STAGE_08_NETWORK_ARCHITECTURE_REPLICATION_SECURITY.md) first.
 
+## Guided lesson: sequence and rate admission
+
+**Use case:** Admit small ordered client messages while rejecting replay and excess requests.
+
+**Complete code:** [NETWORKING_LADDER_ADMISSION.luau](lessons/NETWORKING_LADDER_ADMISSION.luau)
+
+1. `Packet` contains only a sequence and small payload for this lesson.
+2. `admit()` checks payload size, newer sequence, and per-window request count before committing state.
+3. Assertions show one replay and one over-limit packet being rejected.
+
+- **Expected result:** sequences `1` and `2` pass once; replayed `1` and extra `3` fail.
+- **Try it:** reset `requestsThisWindow` to model the next time window.
+- **Common mistake:** treating sequence and rate checks as semantic permission to perform the requested gameplay action.
+
 ## Level 0: Client-server and replication model
 
 Learn:

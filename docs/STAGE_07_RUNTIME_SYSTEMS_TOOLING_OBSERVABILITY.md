@@ -3,6 +3,20 @@
 **Difficulty:** Intermediate
 **Suggested prerequisites:** Stages 1-6
 
+## Guided lesson: bounded diagnostics
+
+**Use case:** Keep only the three most recent lifecycle messages so diagnostics cannot grow forever.
+
+**Complete code:** [STAGE_07_DIAGNOSTICS.luau](lessons/STAGE_07_DIAGNOSTICS.luau)
+
+1. Read `Diagnostics`; capacity and retained messages are explicit.
+2. Follow `record()` as it appends and evicts the oldest extra item.
+3. Record four messages and inspect the remaining three.
+
+- **Expected result:** `joined` is evicted and `spawned` becomes the oldest retained message.
+- **Try it:** change capacity to `1` and update the assertions.
+- **Common mistake:** retaining an unlimited log of players, Instances, payloads, or snapshots in memory.
+
 Observability is evidence collected to answer operational questions. More logs and dashboards do not automatically make a system observable.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

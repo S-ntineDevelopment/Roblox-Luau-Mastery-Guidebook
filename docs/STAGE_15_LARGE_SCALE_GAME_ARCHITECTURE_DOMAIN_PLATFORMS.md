@@ -3,6 +3,20 @@
 **Difficulty:** Advanced
 **Suggested prerequisites:** Stages 3 and 5-9, plus several concrete features to compare
 
+## Guided lesson: share one proven prompt rule
+
+**Use case:** A shop prompt and bell prompt share distance admission but retain different behavior.
+
+**Complete code:** [STAGE_15_DOMAIN_PLATFORM.luau](lessons/STAGE_15_DOMAIN_PLATFORM.luau)
+
+1. `PromptDefinition` contains feature distance and behavior.
+2. `tryRun()` owns the genuinely shared lookup and distance rule.
+3. The two definitions provide their own results without feature-name branches in `tryRun()`.
+
+- **Expected result:** the nearby shop opens; the distant bell request is rejected.
+- **Try it:** add a nearby `SitDown` prompt without editing `tryRun()`.
+- **Common mistake:** extracting a platform before multiple real features reveal the same rule.
+
 A domain platform is shared infrastructure for a family of related features, such as weapons, quests, vehicles, or purchases. It is valuable after the domain’s stable rules and meaningful variations are understood. It is not a maturity badge that every codebase must build.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.

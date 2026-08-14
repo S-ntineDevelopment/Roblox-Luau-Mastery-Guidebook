@@ -3,6 +3,20 @@
 **Difficulty:** Foundation
 **Suggested prerequisites:** Stages 1-3
 
+## Guided lesson: cancel a countdown
+
+**Use case:** A countdown must stop changing state after its round is cancelled.
+
+**Complete code:** [STAGE_04_ASYNC_OWNERSHIP.luau](lessons/STAGE_04_ASYNC_OWNERSHIP.luau)
+
+1. Read the `Operation` record; it is the owner-visible cancellation state.
+2. Notice that `runCountdown()` checks cancellation before each callback.
+3. The callback cancels at `2`, so the loop never visits `1`.
+
+- **Expected result:** the visited values are exactly `3, 2`.
+- **Try it:** cancel before starting and prove no callback runs.
+- **Common mistake:** cancelling a task handle but allowing an already-started callback to mutate replacement state.
+
 Roblox code frequently waits for events, frames, network replies, and cloud services. The goal of this stage is to make those waits understandable and bounded—not to replace the engine scheduler with a custom framework.
 
 Read [Curriculum Accuracy Standard](CURRICULUM_ACCURACY_STANDARD.md) before this stage.
